@@ -527,34 +527,18 @@ async function addLocationToUsername(usernameElement, screenName) {
   try {
     const account = await getAboutAccount(screenName);
 
-    // console.log(`Fetched account info for ${screenName}:`, account);
-
     // Remove spinner
     if (spinnerInserted && spinnerSpan.parentNode) {
       spinnerSpan.remove();
     }
 
-    const location = account?.data?.user_result_by_screen_name?.result?.about_profile?.account_based_in || null;
-
-    if (!location) {
-      console.log(`Fetched account info for ${screenName}:`, account);
-      console.log(`No location found for ${screenName}, leaving unmarked`);
-      usernameElement.dataset.locationAdded = "true";
-      // Leave container without `data-location-added` so it can be retried later.
+    if (!account) {
+      // Not cached or not found, do not show anything
       return;
     }
 
-    // Use location text directly (show location as-is)
-    const locationText =
-      typeof location === "string" ? location.trim() : String(location);
-    if (!locationText) {
-      console.log(`No usable location text for ${screenName}:`, location);
-      // Remove transient marks so it can be retried later
-      delete usernameElement.dataset.locationAdded;
-      delete usernameElement.dataset.locationWaiting;
-      return;
-    }
-
+    const location = account?.data?.user_result_by_screen_name?.result?.about_profile?.account_based_in;
+    const locationText = location && typeof location === "string" && location.trim() ? location.trim() : "Unknown";
     // Check if a location element already exists (check in the entire container)
     const existingLocation = usernameElement.querySelector(
       "[data-twitter-location]"
@@ -564,9 +548,9 @@ async function addLocationToUsername(usernameElement, screenName) {
       return;
     }
 
-    // Add location text formatted as '(Location)' - place it next to verification badge, before @ handle
+    // Add location text formatted as '🌐 Location' or '🌐 Unknown'
     const locationSpan = document.createElement("span");
-    locationSpan.textContent = ` (${locationText})`;
+    locationSpan.textContent = ` 🌐 ${locationText}`;
     locationSpan.setAttribute("data-twitter-location", "true");
     locationSpan.style.marginLeft = "4px";
     locationSpan.style.marginRight = "4px";
