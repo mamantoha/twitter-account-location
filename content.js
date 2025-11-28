@@ -562,10 +562,7 @@ async function addLocationToUsername(usernameElement, screenName) {
 
     // Tooltip/modal logic
     locationSpan.addEventListener("mouseenter", async (e) => {
-      // Remove any existing tooltip
       document.querySelectorAll(".twitter-location-tooltip").forEach((el) => el.remove());
-
-      // Get cached account info
       const cached = await cacheManager.getValue(screenName);
       const account = cached?.account?.data?.user_result_by_screen_name?.result;
       if (!account) return;
@@ -575,46 +572,62 @@ async function addLocationToUsername(usernameElement, screenName) {
       tooltip.className = "twitter-location-tooltip";
       tooltip.style.position = "absolute";
       tooltip.style.zIndex = 9999;
-      tooltip.style.background = "#222";
-      tooltip.style.color = "#fff";
-      tooltip.style.padding = "12px 16px";
-      tooltip.style.borderRadius = "8px";
-      tooltip.style.boxShadow = "0 2px 12px rgba(0,0,0,0.25)";
-      tooltip.style.fontSize = "0.95em";
-      tooltip.style.maxWidth = "320px";
+      tooltip.style.background = "#181c20";
+      tooltip.style.color = "#e7e9ea";
+      tooltip.style.padding = "20px 24px";
+      tooltip.style.borderRadius = "18px";
+      tooltip.style.boxShadow = "0 4px 32px rgba(0,0,0,0.45)";
+      tooltip.style.fontSize = "1em";
+      tooltip.style.maxWidth = "340px";
       tooltip.style.pointerEvents = "none";
+      tooltip.style.border = "1px solid #333";
 
       // Compose content
-      let html = "";
+      let html = "<div style='font-weight:700;font-size:1.15em;margin-bottom:18px;'>About this account</div>";
+      html += `<div style='display:flex;align-items:center;margin-bottom:16px;'>`;
       if (account.avatar?.image_url) {
-        html += `<img src='${account.avatar.image_url.replace("_normal", "_bigger")}' style='width:48px;height:48px;border-radius:50%;margin-bottom:8px;display:block;'>`;
+        html += `<img src='${account.avatar.image_url.replace("_normal", "_bigger")}' style='width:48px;height:48px;border-radius:50%;margin-right:14px;'>`;
       }
-      html += `<div style='font-weight:600;font-size:1.1em;margin-bottom:2px;'>${account.core?.name || ""}</div>`;
-      html += `<div style='color:#1d9bf0;'>@${account.core?.screen_name || ""}</div>`;
-      if (account.core?.created_at) {
-        html += `<div style='margin-top:4px;'>Joined: ${account.core.created_at}</div>`;
+      html += `<div><div style='font-weight:600;font-size:1.1em;'>${account.core?.name || ""}</div>`;
+      html += `<div style='color:#1d9bf0;'>@${account.core?.screen_name || ""}</div></div></div>`;
+
+      html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>📅</span><span>Joined ${account.core?.created_at ? new Date(account.core.created_at).toLocaleString('default', { month: 'long', year: 'numeric' }) : "Unknown"}</span></div>`;
+
+      if (account.about_profile?.account_based_in) {
+        html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>📍</span><span>Account based in ${account.about_profile.account_based_in}</span>`;
+        if (account.about_profile?.location_accurate) {
+          html += `<span style='margin-left:6px;font-size:1.1em;' title='Location accurate'>🛡️</span>`;
+        }
+        html += `</div>`;
       }
-      if (account.verification?.verified || account.is_blue_verified) {
-        html += `<div style='margin-top:4px;'>Verified: <span style='color:#1da1f2;'>${account.is_blue_verified ? "Blue" : "Yes"}</span></div>`;
+
+      if (account.verification_info?.reason?.verified_since_msec) {
+        const since = new Date(Number(account.verification_info.reason.verified_since_msec));
+        html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>✅</span><span>Verified since ${since.toLocaleString('default', { month: 'long', year: 'numeric' })}</span></div>`;
+      } else if (account.verification?.verified || account.is_blue_verified) {
+        html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>✅</span><span>Verified</span></div>`;
       }
+
+      if (account.about_profile?.source) {
+        html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>🌐</span><span>Connected via ${account.about_profile.source}</span></div>`;
+      }
+
       if (account.about_profile?.username_changes) {
-        html += `<div style='margin-top:4px;'>Username changes: ${account.about_profile.username_changes.count}`;
+        html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>🔄</span><span>Username changes: ${account.about_profile.username_changes.count}`;
         if (account.about_profile.username_changes.last_changed_at_msec) {
           const d = new Date(Number(account.about_profile.username_changes.last_changed_at_msec));
           html += ` (last: ${d.toLocaleDateString()})`;
         }
-        html += `</div>`;
+        html += `</span></div>`;
       }
-      if (account.about_profile?.source) {
-        html += `<div style='margin-top:4px;'>Source: ${account.about_profile.source}</div>`;
-      }
+
       tooltip.innerHTML = html;
       document.body.appendChild(tooltip);
 
       // Position tooltip near mouse
       const rect = locationSpan.getBoundingClientRect();
       tooltip.style.left = `${rect.left + window.scrollX}px`;
-      tooltip.style.top = `${rect.bottom + window.scrollY + 6}px`;
+      tooltip.style.top = `${rect.bottom + window.scrollY + 8}px`;
     });
     locationSpan.addEventListener("mouseleave", () => {
       document.querySelectorAll(".twitter-location-tooltip").forEach((el) => el.remove());
