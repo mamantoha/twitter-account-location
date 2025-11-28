@@ -1,39 +1,31 @@
 {
   "manifest_version": 3,
-  "name": "Twitter Account Location Flag",
+  "name": "Twitter Account Location",
   "version": "1.0.0",
-  "description": "Shows country flag emoji next to Twitter usernames based on account location",
-  "permissions": [
-    "activeTab",
-    "storage",
-    "tabs"
-  ],
+  "description": "Show account based location",
+  "permissions": ["activeTab", "storage", "tabs"],
+  "host_permissions": ["https://x.com/*", "https://twitter.com/*"],
+  "icons": {
+    "16": "logo.svg",
+    "32": "logo.svg",
+    "48": "logo.svg",
+    "128": "logo.svg"
+  },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Twitter Location Flag"
+    "default_title": "Twitter Location"
   },
-  "host_permissions": [
-    "https://x.com/*",
-    "https://twitter.com/*"
-  ],
   "content_scripts": [
     {
-      "matches": [
-        "https://x.com/*",
-        "https://twitter.com/*"
-      ],
-      "js": ["countryFlags.js", "content.js"],
+      "matches": ["https://x.com/*", "https://twitter.com/*"],
+      "js": ["cacheManager.js", "content.js"],
       "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
       "resources": ["pageScript.js"],
-      "matches": [
-        "https://x.com/*",
-        "https://twitter.com/*"
-      ]
+      "matches": ["https://x.com/*", "https://twitter.com/*"]
     }
   ]
 }
-

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="96"
+   height="96"
+   viewBox="0 0 96 96"
+   fill="none"
+   version="1.1"
+   id="svg3"
+   sodipodi:docname="logo.svg"
+   inkscape:version="1.4.2 (ebf0e940d0, 2025-05-08)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview3"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="6.1462653"
+     inkscape:cx="39.129453"
+     inkscape:cy="54.667344"
+     inkscape:window-width="1707"
+     inkscape:window-height="932"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg3" />
+  <defs
+     id="defs2">
+    <linearGradient
+       id="pinGradient"
+       x1="48"
+       y1="0"
+       x2="48"
+       y2="96"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         stop-color="#1da1f2"
+         id="stop1" />
+      <stop
+         offset="1"
+         stop-color="#0d8ddb"
+         id="stop2" />
+    </linearGradient>
+  </defs>
+  <!-- Pin outline -->
+  <!-- Internal circle perfectly centered inside pin -->
+  <!-- Twitter bird icon centered -->
+  <path
+     d="m 48,96.465391 c -1.516651,0 -2.920758,-0.801735 -3.69141,-2.107233 l -4.700007,-7.94982 C 29.957756,70.093896 20.843921,54.685158 17.730232,48.435273 15.466511,43.793144 14.327147,38.836966 14.327147,33.672852 14.327147,15.105408 29.432556,0 48,0 c 18.567441,0 33.672853,15.105408 33.672853,33.672852 0,5.160899 -1.13936,10.116004 -3.38379,14.728122 -0.02682,0.05574 -0.0568,0.111471 -0.08575,0.166135 -3.173712,6.333489 -12.229667,21.643618 -21.815112,37.845516 l -4.696796,7.945533 C 50.920757,95.663656 49.51665,96.465391 48,96.465391 Z"
+     style="fill:#0488db;fill-rule:nonzero;stroke:none;stroke-width:1.07184;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none"
+     stroke-linecap="round"
+     id="path1-6" />
+  <path
+     d="m 48.000804,57.195669 c -13.624129,0 -24.70961,-11.083873 -24.70961,-24.708001 0,-13.624129 11.085481,-24.7096098 24.70961,-24.7096098 13.624129,0 24.708002,11.0854808 24.708002,24.7096098 0,13.624128 -11.083873,24.708001 -24.708002,24.708001 z"
+     style="fill:#ffffff;fill-rule:nonzero;stroke:none;stroke-width:1.60776;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:10;stroke-dasharray:none"
+     stroke-linecap="round"
+     id="path2" />
+  <path
+     fill="#1d9bf0"
+     d="m 63.636613,24.018522 c 0.02393,0.34668 0.02393,0.693361 0.02393,1.043236 0,10.66084 -8.115842,22.956028 -22.956022,22.956028 v -0.0064 c -4.383836,0.0064 -8.676608,-1.249329 -12.367082,-3.616983 0.637445,0.07668 1.278085,0.115027 1.920324,0.116623 3.632961,0.0032 7.162076,-1.215777 10.020196,-3.460418 -3.45243,-0.0655 -6.479897,-2.316529 -7.537513,-5.602809 1.209389,0.233249 2.455523,0.185322 3.642545,-0.138993 C 32.619045,34.548289 29.9111,31.241241 29.9111,27.400592 V 27.29835 c 1.12152,0.624663 2.377239,0.971343 3.661716,1.009688 -3.545102,-2.369254 -4.637866,-7.085392 -2.497071,-10.77267 4.096266,5.040451 10.140017,8.104665 16.627902,8.428978 -0.650227,-2.802203 0.238043,-5.738604 2.334105,-7.708457 3.249537,-3.054625 8.360286,-2.898059 11.41491,0.349877 1.806895,-0.356266 3.538699,-1.019273 5.123524,-1.958667 -0.602292,1.867602 -1.862807,3.454029 -3.546687,4.462119 1.5992,-0.188518 3.161661,-0.616678 4.633061,-1.270099 -1.083172,1.623169 -2.447537,3.037052 -4.025966,4.17934 z"
+     id="path1"
+     style="stroke-width:0.159761" />
+</svg>
