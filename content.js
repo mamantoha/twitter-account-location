@@ -576,6 +576,66 @@ async function addLocationToUsername(usernameElement, screenName) {
     locationSpan.style.fontWeight = "500";
     locationSpan.style.verticalAlign = "middle";
 
+    // Tooltip/modal logic
+    locationSpan.addEventListener("mouseenter", async (e) => {
+      // Remove any existing tooltip
+      document.querySelectorAll(".twitter-location-tooltip").forEach((el) => el.remove());
+
+      // Get cached account info
+      const cached = await cacheManager.getValue(screenName);
+      const account = cached?.account?.data?.user_result_by_screen_name?.result;
+      if (!account) return;
+
+      // Create tooltip element
+      const tooltip = document.createElement("div");
+      tooltip.className = "twitter-location-tooltip";
+      tooltip.style.position = "absolute";
+      tooltip.style.zIndex = 9999;
+      tooltip.style.background = "#222";
+      tooltip.style.color = "#fff";
+      tooltip.style.padding = "12px 16px";
+      tooltip.style.borderRadius = "8px";
+      tooltip.style.boxShadow = "0 2px 12px rgba(0,0,0,0.25)";
+      tooltip.style.fontSize = "0.95em";
+      tooltip.style.maxWidth = "320px";
+      tooltip.style.pointerEvents = "none";
+
+      // Compose content
+      let html = "";
+      if (account.avatar?.image_url) {
+        html += `<img src='${account.avatar.image_url.replace("_normal", "_bigger")}' style='width:48px;height:48px;border-radius:50%;margin-bottom:8px;display:block;'>`;
+      }
+      html += `<div style='font-weight:600;font-size:1.1em;margin-bottom:2px;'>${account.core?.name || ""}</div>`;
+      html += `<div style='color:#1d9bf0;'>@${account.core?.screen_name || ""}</div>`;
+      if (account.core?.created_at) {
+        html += `<div style='margin-top:4px;'>Joined: ${account.core.created_at}</div>`;
+      }
+      if (account.verification?.verified || account.is_blue_verified) {
+        html += `<div style='margin-top:4px;'>Verified: <span style='color:#1da1f2;'>${account.is_blue_verified ? "Blue" : "Yes"}</span></div>`;
+      }
+      if (account.about_profile?.username_changes) {
+        html += `<div style='margin-top:4px;'>Username changes: ${account.about_profile.username_changes.count}`;
+        if (account.about_profile.username_changes.last_changed_at_msec) {
+          const d = new Date(Number(account.about_profile.username_changes.last_changed_at_msec));
+          html += ` (last: ${d.toLocaleDateString()})`;
+        }
+        html += `</div>`;
+      }
+      if (account.about_profile?.source) {
+        html += `<div style='margin-top:4px;'>Source: ${account.about_profile.source}</div>`;
+      }
+      tooltip.innerHTML = html;
+      document.body.appendChild(tooltip);
+
+      // Position tooltip near mouse
+      const rect = locationSpan.getBoundingClientRect();
+      tooltip.style.left = `${rect.left + window.scrollX}px`;
+      tooltip.style.top = `${rect.bottom + window.scrollY + 6}px`;
+    });
+    locationSpan.addEventListener("mouseleave", () => {
+      document.querySelectorAll(".twitter-location-tooltip").forEach((el) => el.remove());
+    });
+
     // Use userNameContainer found above, or find it if not found, or fallback to usernameElement
     let containerForLocation =
       userNameContainer ||
