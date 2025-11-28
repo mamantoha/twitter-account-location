@@ -15,6 +15,9 @@
     "default_popup": "popup.html",
     "default_title": "Twitter Location"
   },
+  "background": {
+    "scripts": ["background.js"]
+  },
   "content_scripts": [
     {
       "matches": ["https://x.com/*", "https://twitter.com/*"],
