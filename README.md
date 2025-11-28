@@ -1,3 +1,8 @@
+
+<p align="center">
+  <img src="logo.svg" alt="logo" width="80" height="80"/>
+</p>
+
 # Twitter Account Location
 
 A browser extension that displays Account based location next to Twitter/X usernames.
