@@ -186,12 +186,14 @@
                 )} minutes before retrying...`
               );
 
-              // Store rate limit info for content script
+              // Store rate limit info for content script, include remaining and limit
               window.postMessage(
                 {
                   type: "__rateLimitInfo",
                   resetTime: parseInt(resetTime),
                   waitTime: Math.max(0, waitTime),
+                  remaining: remaining ? parseInt(remaining) : null,
+                  limit: limit ? parseInt(limit) : null,
                 },
                 "*"
               );
