@@ -100,15 +100,11 @@ function injectPageScript() {
       } else {
         rateLimitResetTime = Math.floor(Date.now() / 1000) + 120;
       }
-      // Store extra info if available
-      if (typeof event.data.limit !== "undefined")
-        latestRateLimitInfo.limit = event.data.limit;
-      if (typeof event.data.remaining !== "undefined")
-        latestRateLimitInfo.remaining = event.data.remaining;
-      if (typeof event.data.resetTime !== "undefined")
-        latestRateLimitInfo.resetTime = event.data.resetTime;
-      if (typeof event.data.waitTime !== "undefined")
-        latestRateLimitInfo.waitTime = event.data.waitTime;
+      // Store extra info
+      latestRateLimitInfo.limit = event.data.limit;
+      latestRateLimitInfo.remaining = event.data.remaining;
+      latestRateLimitInfo.resetTime = event.data.resetTime;
+      latestRateLimitInfo.waitTime = event.data.waitTime;
     }
     // Optionally, listen for full rate limit info from page script
     if (event.data && event.data.type === "__rateLimitHeaders") {
