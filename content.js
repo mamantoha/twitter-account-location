@@ -560,77 +560,99 @@ async function addLocationToUsername(usernameElement, screenName) {
     locationSpan.style.fontWeight = "500";
     locationSpan.style.verticalAlign = "middle";
 
-    // Tooltip/modal logic
-    locationSpan.addEventListener("mouseenter", async (e) => {
-      document.querySelectorAll(".twitter-location-tooltip").forEach((el) => el.remove());
-      const cached = await cacheManager.getValue(screenName);
-      const account = cached?.account?.data?.user_result_by_screen_name?.result;
-      if (!account) return;
+    // Tooltip/modal logic with robust hover
+    let tooltip = null;
+    let hideTimeout = null;
+    function showTooltip() {
+      if (tooltip) return;
+      (async () => {
+        document.querySelectorAll('.twitter-location-tooltip').forEach((el) => el.remove());
+        const cached = await cacheManager.getValue(screenName);
+        const account = cached?.account?.data?.user_result_by_screen_name?.result;
+        if (!account) return;
 
-      // Create tooltip element
-      const tooltip = document.createElement("div");
-      tooltip.className = "twitter-location-tooltip";
-      tooltip.style.position = "absolute";
-      tooltip.style.zIndex = 9999;
-      tooltip.style.background = "#181c20";
-      tooltip.style.color = "#e7e9ea";
-      tooltip.style.padding = "20px 24px";
-      tooltip.style.borderRadius = "18px";
-      tooltip.style.boxShadow = "0 4px 32px rgba(0,0,0,0.45)";
-      tooltip.style.fontSize = "1em";
-      tooltip.style.maxWidth = "340px";
-      tooltip.style.pointerEvents = "none";
-      tooltip.style.border = "1px solid #333";
+        tooltip = document.createElement('div');
+        tooltip.className = 'twitter-location-tooltip';
+        tooltip.style.position = 'absolute';
+        tooltip.style.zIndex = 9999;
+        tooltip.style.background = '#181c20';
+        tooltip.style.color = '#e7e9ea';
+        tooltip.style.padding = '20px 24px';
+        tooltip.style.borderRadius = '18px';
+        tooltip.style.boxShadow = '0 4px 32px rgba(0,0,0,0.45)';
+        tooltip.style.fontSize = '1em';
+        tooltip.style.maxWidth = '340px';
+        tooltip.style.pointerEvents = 'auto';
+        tooltip.style.userSelect = 'text';
+        tooltip.style.border = '1px solid #333';
 
-      // Compose content
-      let html = "<div style='font-weight:700;font-size:1.15em;margin-bottom:18px;'>About this account</div>";
-      html += `<div style='display:flex;align-items:center;margin-bottom:16px;'>`;
-      if (account.avatar?.image_url) {
-        html += `<img src='${account.avatar.image_url.replace("_normal", "_bigger")}' style='width:48px;height:48px;border-radius:50%;margin-right:14px;'>`;
-      }
-      html += `<div><div style='font-weight:600;font-size:1.1em;'>${account.core?.name || ""}</div>`;
-      html += `<div style='color:#1d9bf0;'>@${account.core?.screen_name || ""}</div></div></div>`;
-
-      html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>📅</span><span>Joined ${account.core?.created_at ? new Date(account.core.created_at).toLocaleString('default', { month: 'long', year: 'numeric' }) : "Unknown"}</span></div>`;
-
-      if (account.about_profile?.account_based_in) {
-        html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>📍</span><span>Account based in ${account.about_profile.account_based_in}</span>`;
-        if (account.about_profile?.location_accurate) {
-          html += `<span style='margin-left:6px;font-size:1.1em;' title='Location accurate'>🛡️</span>`;
+        let html = "<div style='font-weight:700;font-size:1.15em;margin-bottom:18px;'>About this account</div>";
+        html += `<div style='display:flex;align-items:center;margin-bottom:16px;'>`;
+        if (account.avatar?.image_url) {
+          html += `<img src='${account.avatar.image_url.replace("_normal", "_bigger")}' style='width:48px;height:48px;border-radius:50%;margin-right:14px;'>`;
         }
-        html += `</div>`;
-      }
+        html += `<div><div style='font-weight:600;font-size:1.1em;'>${account.core?.name || ""}</div>`;
+        html += `<div style='color:#1d9bf0;'>@${account.core?.screen_name || ""}</div></div></div>`;
 
-      if (account.verification_info?.reason?.verified_since_msec) {
-        const since = new Date(Number(account.verification_info.reason.verified_since_msec));
-        html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>✅</span><span>Verified since ${since.toLocaleString('default', { month: 'long', year: 'numeric' })}</span></div>`;
-      } else if (account.verification?.verified || account.is_blue_verified) {
-        html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>✅</span><span>Verified</span></div>`;
-      }
+        html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>📅</span><span>Joined ${account.core?.created_at ? new Date(account.core.created_at).toLocaleString('default', { month: 'long', year: 'numeric' }) : "Unknown"}</span></div>`;
 
-      if (account.about_profile?.source) {
-        html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>🌐</span><span>Connected via ${account.about_profile.source}</span></div>`;
-      }
-
-      if (account.about_profile?.username_changes) {
-        html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>🔄</span><span>Username changes: ${account.about_profile.username_changes.count}`;
-        if (account.about_profile.username_changes.last_changed_at_msec) {
-          const d = new Date(Number(account.about_profile.username_changes.last_changed_at_msec));
-          html += ` (last: ${d.toLocaleDateString()})`;
+        if (account.about_profile?.account_based_in) {
+          html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>📍</span><span>Account based in ${account.about_profile.account_based_in}</span>`;
+          if (account.about_profile?.location_accurate) {
+            html += `<span style='margin-left:6px;font-size:1.1em;' title='Location accurate'>🛡️</span>`;
+          }
+          html += `</div>`;
         }
-        html += `</span></div>`;
+
+        if (account.verification_info?.reason?.verified_since_msec) {
+          const since = new Date(Number(account.verification_info.reason.verified_since_msec));
+          html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>✅</span><span>Verified since ${since.toLocaleString('default', { month: 'long', year: 'numeric' })}</span></div>`;
+        } else if (account.verification?.verified || account.is_blue_verified) {
+          html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>✅</span><span>Verified</span></div>`;
+        }
+
+        if (account.about_profile?.source) {
+          html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>🌐</span><span>Connected via ${account.about_profile.source}</span></div>`;
+        }
+
+        if (account.about_profile?.username_changes) {
+          html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>🔄</span><span>Username changes: ${account.about_profile.username_changes.count}`;
+          if (account.about_profile.username_changes.last_changed_at_msec) {
+            const d = new Date(Number(account.about_profile.username_changes.last_changed_at_msec));
+            html += ` (last: ${d.toLocaleDateString()})`;
+          }
+          html += `</span></div>`;
+        }
+
+        tooltip.innerHTML = html;
+        document.body.appendChild(tooltip);
+
+        // Position tooltip near location span
+        const rect = locationSpan.getBoundingClientRect();
+        tooltip.style.left = `${rect.left + window.scrollX}px`;
+        tooltip.style.top = `${rect.bottom + window.scrollY + 8}px`;
+
+        // Hide logic: only hide when mouse leaves both locationSpan and tooltip
+        tooltip.addEventListener('mouseenter', () => {
+          if (hideTimeout) clearTimeout(hideTimeout);
+        });
+        tooltip.addEventListener('mouseleave', () => {
+          hideTimeout = setTimeout(hideTooltip, 80);
+        });
+      })();
+    }
+    function hideTooltip() {
+      if (tooltip) {
+        tooltip.remove();
+        tooltip = null;
       }
-
-      tooltip.innerHTML = html;
-      document.body.appendChild(tooltip);
-
-      // Position tooltip near mouse
-      const rect = locationSpan.getBoundingClientRect();
-      tooltip.style.left = `${rect.left + window.scrollX}px`;
-      tooltip.style.top = `${rect.bottom + window.scrollY + 8}px`;
+    }
+    locationSpan.addEventListener('mouseenter', () => {
+      if (hideTimeout) clearTimeout(hideTimeout);
+      showTooltip();
     });
-    locationSpan.addEventListener("mouseleave", () => {
-      document.querySelectorAll(".twitter-location-tooltip").forEach((el) => el.remove());
+    locationSpan.addEventListener('mouseleave', () => {
+      hideTimeout = setTimeout(hideTooltip, 80);
     });
 
     // Use userNameContainer found above, or find it if not found, or fallback to usernameElement
