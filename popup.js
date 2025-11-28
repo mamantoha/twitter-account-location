@@ -21,6 +21,13 @@ const rateLimitInfo = document.getElementById("rateLimitInfo");
     updateToggle(isEnabled);
     await updateCacheCount();
     await updateRateLimitInfo();
+    // Show extension version only
+    const manifest = browser.runtime.getManifest();
+    const version = manifest.version || "?";
+    const extVersion = document.getElementById("extVersion");
+    if (extVersion) {
+      extVersion.textContent = `Version: ${version}`;
+    }
   } catch (e) {
     console.error("Error loading toggle state in popup:", e);
     updateToggle(DEFAULT_ENABLED);
