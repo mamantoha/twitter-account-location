@@ -1,11 +1,9 @@
-
-<p align="center">
-  <img src="logo.svg" alt="logo" width="80" height="80"/>
-</p>
-
-# Twitter Account Location
-
-A browser extension that displays Account based location next to Twitter/X usernames.
+<div align="center">
+<img src="logo.svg" alt="logo" width="80" height="80"/>
+<h1>Twitter Account Location</h1>
+<h3>A browser extension that displays Account based location information next to Twitter/X usernames.
+</h3>
+</div>
 
 > Note: This repository is a fork of https://github.com/RhysSullivan/twitter-account-location-in-username — "Twitter Account Location Flag".
 
