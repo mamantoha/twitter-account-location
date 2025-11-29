@@ -35,5 +35,8 @@
     "gecko": {
       "id": "twitter-account-location@mamantoha.com"
     }
+  },
+  "data_collection": {
+    "collects_user_data": false
   }
 }
