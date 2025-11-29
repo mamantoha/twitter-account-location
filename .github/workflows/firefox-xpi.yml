@@ -22,8 +22,7 @@ jobs:
 
       - name: Build XPI (zip extension files)
         run: |
-          cd ..
-          zip -r twitter-account-location/dist/build/twitter-account-location-${{ github.ref_name }}.xpi twitter-account-location
+          zip -r dist/build/twitter-account-location-${{ github.ref_name }}.xpi .
 
       - name: Upload XPI artifact
         uses: actions/upload-artifact@v4
