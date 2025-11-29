@@ -1,0 +1,39 @@
+name: Build Firefox Extension XPI
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-xpi:
+    runs-on: ubuntu-latest
+    name: Build and Upload XPI
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install zip (if needed)
+        run: sudo apt-get update && sudo apt-get install -y zip
+
+      - name: Build XPI (zip extension files)
+        run: |
+          cd ..
+          zip -r twitter-account-location-${{ github.ref_name }}.xpi twitter-account-location
+
+      - name: Upload XPI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox-extension-xpi
+          path: twitter-account-location-${{ github.ref_name }}.xpi
+
+      - name: Attach XPI to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: twitter-account-location-${{ github.ref_name }}.xpi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
