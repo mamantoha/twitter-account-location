@@ -85,7 +85,6 @@ class CacheManager {
   // Save a cache entry to IndexedDB
   async saveCacheEntry(username, account) {
     if (!browser.runtime?.id) {
-      console.log("Extension context invalidated, skipping cache entry save");
       return;
     }
 
@@ -131,7 +130,6 @@ class CacheManager {
   // Load cache from persistent storage (no-op since we don't need to preload anything now)
   async loadCache() {
     // Previously loaded final markers, but now we don't need to preload anything
-    console.log("Cache loading completed (no preloading needed)");
   }
 }
 

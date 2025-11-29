@@ -43,7 +43,6 @@ async function loadEnabledState() {
     const result = await browser.storage.local.get([TOGGLE_KEY]);
     extensionEnabled =
       result[TOGGLE_KEY] !== undefined ? result[TOGGLE_KEY] : DEFAULT_ENABLED;
-    console.log("Extension enabled:", extensionEnabled);
   } catch (error) {
     console.error("Error loading enabled state:", error);
     extensionEnabled = DEFAULT_ENABLED;
@@ -57,7 +56,6 @@ browser.runtime.onMessage.addListener(async (request) => {
     return latestRateLimitInfo;
   } else if (request.type === "extensionToggle") {
     extensionEnabled = request.enabled;
-    console.log("Extension toggled:", extensionEnabled);
 
     if (extensionEnabled) {
       // Re-initialize if enabled
@@ -146,11 +144,6 @@ async function processRequestQueue() {
       const nowSec = Math.floor(Date.now() / 1000);
       if (nowSec < rateLimitResetTime) {
         const waitTime = (rateLimitResetTime - nowSec) * 1000;
-        console.log(
-          `Rate limited while processing queue. Pausing further requests for ${Math.ceil(
-            waitTime / 1000 / 60
-          )} minutes...`
-        );
         setTimeout(processRequestQueue, Math.min(waitTime, 60000));
         break;
       } else {
@@ -235,7 +228,6 @@ async function getAboutAccount(screenName) {
   // Check if there's already a request in progress for this username
   let promise = inFlightRequests.get(screenName);
   if (promise) {
-    console.log(`Reusing in-flight request for ${screenName}`);
     return promise;
   }
 
@@ -250,7 +242,6 @@ async function getAboutAccount(screenName) {
     }
 
     // Not cached, queue the API request
-    console.log(`Queuing API request for ${screenName}`);
     return new Promise((resolve, reject) => {
       if (!requestQueue.has(screenName)) {
         requestQueue.set(screenName, []);
@@ -276,8 +267,6 @@ async function getAboutAccount(screenName) {
 
 // Function to extract username from various Twitter UI elements
 function extractUsername(element) {
-  // console.log("Extracting username from element:", element);
-
   // Try data-testid="UserName" or "User-Name" first (most reliable)
   let usernameElement = element.querySelector(
     '[data-testid="UserName"], [data-testid="User-Name"]'
@@ -288,17 +277,14 @@ function extractUsername(element) {
     usernameElement = element;
   }
 
-  // console.log("Username element for extraction:", usernameElement);
-
   if (usernameElement) {
     const links = usernameElement.querySelectorAll('a[href^="/"]');
-    // console.log("Links found for username extraction:", links);
+
     for (const link of links) {
       const href = link.getAttribute("href");
       const match = href.match(/^\/([^\/\?]+)/);
       if (match && match[1]) {
         const username = match[1];
-        // console.log("Extracted username:", username);
 
         // Filter out common routes
         if (
@@ -515,9 +501,6 @@ async function addLocationToUsername(usernameElement, screenName) {
   let spinnerInserted = false;
   if (userNameContainer) {
     spinnerInserted = insertElementNearHandle(userNameContainer, screenName, spinnerSpan);
-    if (!spinnerInserted) {
-      console.log("Failed to insert spinner");
-    }
   }
 
   try {
@@ -721,8 +704,6 @@ function removeAllLocations() {
   waitingContainers.forEach((container) => {
     delete container.dataset.locationWaiting;
   });
-
-  console.log("Removed all locations");
 }
 
 // Function to process all username elements on the page
@@ -759,13 +740,7 @@ async function processUsernames() {
         skippedCount++;
       }
     } else {
-      // Debug: log containers that don't have usernames
-      const hasUserName = container.querySelector(
-        '[data-testid="UserName"], [data-testid="User-Name"]'
-      );
-      if (hasUserName) {
-        console.log("Found UserName container but no username extracted");
-      }
+      // do nothing
     }
   }
 }
@@ -804,8 +779,6 @@ function initObserver() {
 
 // Main initialization
 async function init() {
-  console.log("Twitter Location extension initialized");
-
   // Load enabled state first
   await loadEnabledState();
 
@@ -814,7 +787,6 @@ async function init() {
 
   // Only proceed if extension is enabled
   if (!extensionEnabled) {
-    console.log("Extension is disabled");
     return;
   }
 
@@ -835,7 +807,6 @@ async function init() {
     const url = location.href;
     if (url !== lastUrl) {
       lastUrl = url;
-      console.log("Page navigation detected, reprocessing usernames");
       setTimeout(processUsernames, 2000);
     }
   }).observe(document, { subtree: true, childList: true });

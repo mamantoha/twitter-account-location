@@ -72,7 +72,6 @@
   // Wait a bit for Twitter to make some API calls first
   setTimeout(() => {
     if (!headersReady) {
-      console.log("No Twitter headers captured yet, using defaults");
       twitterHeaders = {
         Accept: "application/json",
         "Content-Type": "application/json",
@@ -177,15 +176,6 @@
               const now = Date.now();
               const waitTime = resetDate.getTime() - now;
 
-              console.log(
-                `Rate limit resets at: ${resetDate.toLocaleString()}`
-              );
-              console.log(
-                `Waiting ${Math.ceil(
-                  waitTime / 1000 / 60
-                )} minutes before retrying...`
-              );
-
               // Store rate limit info for content script, include remaining and limit
               window.postMessage(
                 {
@@ -199,12 +189,7 @@
               );
             }
           } else {
-            console.log(
-              `Twitter API error for ${screenName}:`,
-              response.status,
-              response.statusText,
-              errorText.substring(0, 200)
-            );
+            // do nothing
           }
         }
 
