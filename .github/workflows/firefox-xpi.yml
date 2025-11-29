@@ -33,6 +33,8 @@ jobs:
       - name: Attach XPI to release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/build/twitter-account-location-${{ github.ref_name }}.xpi
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: dist/build/twitter-account-location-${{ github.ref_name }}.xpi
+          asset_name: twitter-account-location_${{ github.ref_name }}.xpi
+          tag: ${{ github.ref }}
+          overwrite: true
