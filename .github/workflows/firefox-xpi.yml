@@ -31,7 +31,7 @@ jobs:
           path: dist/build/twitter-account-location-${{ github.ref_name }}.xpi
 
       - name: Attach XPI to release
-        uses: softprops/action-gh-release@v2
+        uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: dist/build/twitter-account-location-${{ github.ref_name }}.xpi
