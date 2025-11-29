@@ -30,5 +30,10 @@
       "resources": ["pageScript.js"],
       "matches": ["https://x.com/*", "https://twitter.com/*"]
     }
-  ]
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "twitter-account-location@mamantoha.com"
+    }
+  }
 }
