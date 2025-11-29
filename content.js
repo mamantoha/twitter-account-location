@@ -603,7 +603,12 @@ async function addLocationToUsername(usernameElement, screenName) {
           html += `</span></div>`;
         }
 
-        tooltip.innerHTML = html;
+
+        // Safer: use DOMParser to parse the HTML and append nodes
+        // This avoids direct assignment to innerHTML with dynamic content
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(`<div>${html}</div>`, 'text/html');
+        Array.from(doc.body.firstChild.childNodes).forEach(node => tooltip.appendChild(node));
         document.body.appendChild(tooltip);
 
         // Position tooltip near location span
