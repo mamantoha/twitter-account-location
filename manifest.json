@@ -33,10 +33,10 @@
   ],
   "browser_specific_settings": {
     "gecko": {
-      "id": "twitter-account-location@mamantoha.com"
+      "id": "twitter-account-location@mamantoha.com",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
     }
-  },
-  "data_collection": {
-    "collects_user_data": false
   }
 }
