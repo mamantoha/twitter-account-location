@@ -17,3 +17,4 @@ Thumbs.db
 node_modules/
 
 dist/build/
+web-ext-artifacts/
