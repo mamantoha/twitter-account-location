@@ -23,17 +23,17 @@ jobs:
       - name: Build XPI (zip extension files)
         run: |
           cd ..
-          zip -r twitter-account-location-${{ github.ref_name }}.xpi twitter-account-location
+          zip -r twitter-account-location/dist/build/twitter-account-location-${{ github.ref_name }}.xpi twitter-account-location
 
       - name: Upload XPI artifact
         uses: actions/upload-artifact@v4
         with:
           name: firefox-extension-xpi
-          path: twitter-account-location-${{ github.ref_name }}.xpi
+          path: dist/build/twitter-account-location-${{ github.ref_name }}.xpi
 
       - name: Attach XPI to release
         uses: softprops/action-gh-release@v2
         with:
-          files: twitter-account-location-${{ github.ref_name }}.xpi
+          files: dist/build/twitter-account-location-${{ github.ref_name }}.xpi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
