@@ -51,6 +51,15 @@ async function loadEnabledState() {
 
 // Listen for toggle changes from popup
 browser.runtime.onMessage.addListener(async (request) => {
+  if (request.type === "checkExtensionEnabled") {
+    // Re-check enabled state and clean up if needed
+    await loadEnabledState();
+    if (!extensionEnabled) {
+      removeAllLocations();
+    }
+    return;
+  }
+
   if (request.type === "getRateLimitInfo") {
     // Return latest rate limit info
     return latestRateLimitInfo;

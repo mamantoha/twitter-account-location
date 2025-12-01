@@ -10,7 +10,12 @@ function isTwitterUrl(url) {
 }
 
 // Update icon for a given tab
-function updateIcon(tabId, url) {
+function updateState(tabId, url) {
+  // Also notify content script to check enabled state and clean up if needed
+  if (isTwitterUrl(url)) {
+    browser.tabs.sendMessage(tabId, { type: "checkExtensionEnabled" }).catch(() => {});
+  }
+
   if (!isTwitterUrl(url)) {
     // Disable icon on non-Twitter tabs
     browser.action.disable(tabId);
@@ -23,13 +28,13 @@ function updateIcon(tabId, url) {
 // Listen for tab activation
 browser.tabs.onActivated.addListener(async (activeInfo) => {
   const tab = await browser.tabs.get(activeInfo.tabId);
-  updateIcon(tab.id, tab.url);
+  updateState(tab.id, tab.url);
 });
 
 // Listen for tab updates (URL changes)
 browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.url) {
-    updateIcon(tabId, changeInfo.url);
+  updateState(tabId, changeInfo.url);
   }
 });
 
@@ -38,7 +43,7 @@ browser.windows.onFocusChanged.addListener(async (windowId) => {
   if (windowId === browser.windows.WINDOW_ID_NONE) return;
   const tabs = await browser.tabs.query({ active: true, windowId });
   if (tabs[0]) {
-    updateIcon(tabs[0].id, tabs[0].url);
+  updateState(tabs[0].id, tabs[0].url);
   }
 });
 
@@ -46,6 +51,6 @@ browser.windows.onFocusChanged.addListener(async (windowId) => {
 (async function initAllTabs() {
   const tabs = await browser.tabs.query({});
   for (const tab of tabs) {
-    updateIcon(tab.id, tab.url);
+  updateState(tab.id, tab.url);
   }
 })();
