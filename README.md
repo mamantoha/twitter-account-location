@@ -17,8 +17,11 @@
 - [Table of Contents](#table-of-contents)
   - [Features](#features)
   - [Installation](#installation)
-    - [Install from Firefox Add-ons (Recommended)](#install-from-firefox-add-ons-recommended)
-    - [Manual Installation (Development)](#manual-installation-development)
+    - [Firefox](#firefox)
+      - [From Firefox Add-ons](#from-firefox-add-ons)
+      - [Manual Installation](#manual-installation)
+    - [Chrome](#chrome)
+      - [Manual Installation](#manual-installation-1)
   - [How It Works](#how-it-works)
   - [Technical Details](#technical-details)
   - [API Endpoint](#api-endpoint)
@@ -42,18 +45,30 @@
 
 ## Installation
 
-### Install from Firefox Add-ons (Recommended)
+### Firefox
+
+#### From Firefox Add-ons
 
 1. Visit the [Firefox Add-ons page](https://addons.mozilla.org/uk/firefox/addon/twitter-account-location/).
 2. Click **Add to Firefox** and follow the prompts.
 
-### Manual Installation (Development)
+#### Manual Installation
 
 1. Clone or download this repository.
 2. In Firefox, open `about:debugging#/runtime/this-firefox`.
 3. Click **Load Temporary Add-on...** and select the `manifest.json` file from this repository (or any file inside the extension directory).
 4. The extension will be loaded temporarily and will remain active until Firefox is restarted.
-5. For permanent distribution, package the extension as an XPI and follow [MDN/Add-ons signing and distribution guides](https://extensionworkshop.com/documentation/publish/).
+
+### Chrome
+
+#### Manual Installation
+
+1. Download the latest Chrome ZIP from the [GitHub Releases page](https://github.com/mamantoha/twitter-account-location/releases).
+2. In Chrome, go to `chrome://extensions/`.
+3. Enable **Developer mode** (toggle in the top right).
+4. Drag and drop the ZIP file onto the extensions page.
+5. The extension will be installed and appear in your Chrome extensions list.
+6. To update, remove the old version and repeat these steps with the new ZIP.
 
 ## How It Works
 
