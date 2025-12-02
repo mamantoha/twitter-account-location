@@ -20,21 +20,21 @@ jobs:
       - name: Install zip (if needed)
         run: sudo apt-get update && sudo apt-get install -y zip
 
-      - name: Build XPI (zip extension files)
+      - name: Build Firefox extension
         run: |
-          zip -r dist/build/twitter-account-location-${{ github.ref_name }}.xpi .
+          make firefox
 
-      - name: Upload XPI artifact
+      - name: Upload Firefox extension artifact
         uses: actions/upload-artifact@v4
         with:
-          name: firefox-extension-xpi
-          path: dist/build/twitter-account-location-${{ github.ref_name }}.xpi
+          name: firefox-extension
+          path: dist/build/twitter_account_location-${{ github.ref_name }}.firefox.zip
 
-      - name: Attach XPI to release
+      - name: Attach Firefox extension to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: dist/build/twitter-account-location-${{ github.ref_name }}.xpi
-          asset_name: twitter-account-location_${{ github.ref_name }}.xpi
+          file: dist/build/twitter_account_location-${{ github.ref_name }}.firefox.zip
+          asset_name: twitter_account_location-${{ github.ref_name }}.firefox.zip
           tag: ${{ github.ref }}
           overwrite: true
