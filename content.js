@@ -1,3 +1,7 @@
+// Polyfill: use chrome if browser is undefined (for Chrome compatibility)
+if (typeof browser === "undefined") {
+  var browser = chrome;
+}
 // Common routes to exclude from username extraction
 const EXCLUDED_ROUTES = [
   "home",

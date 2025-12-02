@@ -1,3 +1,7 @@
+// Polyfill: use chrome if browser is undefined (for Chrome compatibility)
+if (typeof browser === "undefined") {
+  var browser = chrome;
+}
 // CacheManager class for handling IndexedDB operations
 class CacheManager {
   constructor() {

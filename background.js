@@ -1,3 +1,7 @@
+// Polyfill: use chrome if browser is undefined (for Chrome compatibility)
+if (typeof browser === "undefined") {
+  var browser = chrome;
+}
 // background.js for Twitter Account Location extension
 // Handles icon enable/disable based on active tab
 
