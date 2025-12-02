@@ -7,10 +7,7 @@ if (typeof browser === "undefined") {
 
 // Helper: check if a URL is a Twitter/X domain
 function isTwitterUrl(url) {
-  return (
-    url &&
-    (url.startsWith("https://twitter.com/") || url.startsWith("https://x.com/"))
-  );
+  return url && url.startsWith("https://x.com/");
 }
 
 // Update icon for a given tab

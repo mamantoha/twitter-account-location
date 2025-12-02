@@ -4,7 +4,7 @@
   "version": "1.0.1",
   "description": "Show account based location",
   "permissions": ["activeTab", "storage", "tabs"],
-  "host_permissions": ["https://x.com/*", "https://twitter.com/*"],
+  "host_permissions": ["https://x.com/*"],
   "icons": {
     "16": "assets/logo.svg",
     "32": "assets/logo.svg",
@@ -20,7 +20,7 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://x.com/*", "https://twitter.com/*"],
+      "matches": ["https://x.com/*"],
       "js": ["cacheManager.js", "content.js"],
       "run_at": "document_idle"
     }
@@ -28,7 +28,7 @@
   "web_accessible_resources": [
     {
       "resources": ["pageScript.js"],
-      "matches": ["https://x.com/*", "https://twitter.com/*"]
+      "matches": ["https://x.com/*"]
     }
   ],
   "browser_specific_settings": {
