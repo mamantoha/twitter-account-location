@@ -7,7 +7,7 @@ CHROME_MANIFEST=manifest.chrome.json
 FIREFOX_ZIP=$(DIST_DIR)/$(EXT_NAME)-v$(EXT_VERSION).firefox.zip
 CHROME_ZIP=$(DIST_DIR)/$(EXT_NAME)-v$(EXT_VERSION).chrome.zip
 
-EXT_FILES=background.js cacheManager.js content.js pageScript.js popup.html popup.js README.md LICENSE logo.svg assets/*
+EXT_FILES=background.js cacheManager.js content.js pageScript.js popup.html popup.js README.md LICENSE assets/*
 
 all: firefox chrome
 
