@@ -5,6 +5,7 @@
 </h3>
 </div>
 
+[![Get it on Firefox Add-ons](https://img.shields.io/amo/v/twitter-account-location?label=Firefox%20Add-on)](https://addons.mozilla.org/uk/firefox/addon/twitter-account-location/)
 [![GitHub release](https://img.shields.io/github/release/mamantoha/twitter-account-location.svg)](https://github.com/mamantoha/twitter-account-location/releases)
 [![License](https://img.shields.io/github/license/mamantoha/twitter-account-location.svg)](https://github.com/mamantoha/twitter-account-location/blob/main/LICENSE)
 
