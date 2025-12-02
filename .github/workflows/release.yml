@@ -1,13 +1,13 @@
-name: Build Firefox Extension XPI
+name: Build Browser Extensions
 
 on:
   release:
     types: [published]
 
 jobs:
-  build-xpi:
+  build-firefox:
     runs-on: ubuntu-latest
-    name: Build and Upload XPI
+    name: Build and Upload Firefox ZIP
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -15,7 +15,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install zip (if needed)
         run: sudo apt-get update && sudo apt-get install -y zip
@@ -36,5 +36,39 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: dist/build/twitter_account_location-${{ github.ref_name }}.firefox.zip
           asset_name: twitter_account_location-${{ github.ref_name }}.firefox.zip
+          tag: ${{ github.ref }}
+          overwrite: true
+
+  build-chrome:
+    runs-on: ubuntu-latest
+    name: Build and Upload Chrome ZIP
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install zip (if needed)
+        run: sudo apt-get update && sudo apt-get install -y zip
+
+      - name: Build Chrome extension
+        run: |
+          make chrome
+
+      - name: Upload Chrome extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-extension
+          path: dist/build/twitter_account_location-${{ github.ref_name }}.chrome.zip
+
+      - name: Attach Chrome extension to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: dist/build/twitter_account_location-${{ github.ref_name }}.chrome.zip
+          asset_name: twitter_account_location-${{ github.ref_name }}.chrome.zip
           tag: ${{ github.ref }}
           overwrite: true
