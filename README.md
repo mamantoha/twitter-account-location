@@ -32,8 +32,7 @@
   - [Support](#support)
   - [License](#license)
 
-> **Note:** This repository is a fork of [RhysSullivan/twitter-account-location-in-username](https://github.com/RhysSullivan/twitter-account-location-in-username) — "Twitter Account Location Flag".
-> This fork targets Firefox as a WebExtension and uses `browser.*` APIs for compatibility.
+> **Note:** Originally this project started as a fork of [RhysSullivan/twitter-account-location-in-username](https://github.com/RhysSullivan/twitter-account-location-in-username).
 
 ## Features
 
