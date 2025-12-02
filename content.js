@@ -54,39 +54,44 @@ async function loadEnabledState() {
 }
 
 // Listen for toggle changes from popup
-browser.runtime.onMessage.addListener(async (request) => {
+browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "checkExtensionEnabled") {
-    // Re-check enabled state and clean up if needed
-    await loadEnabledState();
-    if (!extensionEnabled) {
-      removeAllLocations();
-    }
+    (async () => {
+      await loadEnabledState();
+      if (!extensionEnabled) {
+        removeAllLocations();
+      }
+    })();
     return;
   }
 
   if (request.type === "getRateLimitInfo") {
-    // Return latest rate limit info
-    return latestRateLimitInfo;
+    sendResponse(latestRateLimitInfo);
+    return true;
   } else if (request.type === "extensionToggle") {
     extensionEnabled = request.enabled;
-
     if (extensionEnabled) {
-      // Re-initialize if enabled
       setTimeout(() => {
         processUsernames();
       }, 500);
     } else {
-      // Remove all locations if disabled
       removeAllLocations();
     }
+    return;
   } else if (request.type === "getCacheCount") {
-    try {
-      const count = await cacheManager.getCacheCount();
-      return { count };
-    } catch (e) {
-      console.error("Error getting cache count:", e);
-      return { count: 0 };
-    }
+    (async () => {
+      try {
+        if (typeof cacheManager === "undefined") {
+          sendResponse({ count: 0 });
+          return;
+        }
+        const count = await cacheManager.getCacheCount();
+        sendResponse({ count });
+      } catch (e) {
+        sendResponse({ count: 0 });
+      }
+    })();
+    return true;
   }
 });
 
