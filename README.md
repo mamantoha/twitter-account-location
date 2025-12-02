@@ -5,6 +5,10 @@
 </h3>
 </div>
 
+[![GitHub release](https://img.shields.io/github/release/mamantoha/twitter-account-location.svg)](https://github.com/mamantoha/twitter-account-location/releases)
+[![License](https://img.shields.io/github/license/mamantoha/twitter-account-location.svg)](https://github.com/mamantoha/twitter-account-location/blob/main/LICENSE)
+
+
 > Note: This repository is a fork of https://github.com/RhysSullivan/twitter-account-location-in-username — "Twitter Account Location Flag".
 
 > This fork targets Firefox as a WebExtension and uses `browser.*` APIs for compatibility.
