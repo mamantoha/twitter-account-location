@@ -32,7 +32,7 @@
   - [Support](#support)
   - [License](#license)
 
-> **Note:** Originally this project started as a fork of [RhysSullivan/twitter-account-location-in-username](https://github.com/RhysSullivan/twitter-account-location-in-username).
+> **Note:** This project was originally forked from [RhysSullivan/twitter-account-location-in-username](https://github.com/RhysSullivan/twitter-account-location-in-username). It has since evolved to support both Firefox and Chrome, with additional features and improvements.
 
 ## Features
 
