@@ -1,5 +1,5 @@
 EXT_NAME=twitter_account_location
-EXT_VERSION=1.0.2
+EXT_VERSION=1.0.3
 DIST_DIR=dist/build
 FIREFOX_MANIFEST=manifest.firefox.json
 CHROME_MANIFEST=manifest.chrome.json
