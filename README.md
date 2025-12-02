@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="logo.svg" alt="logo" width="80" height="80"/>
+  <img src="assets/logo.svg" alt="logo" width="80" height="80"/>
   <h1>Twitter Account Location</h1>
   <h3>A browser extension that displays account-based location information next to Twitter/X usernames.</h3>
 

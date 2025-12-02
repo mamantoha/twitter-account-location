@@ -6,10 +6,10 @@
   "permissions": ["activeTab", "storage", "tabs"],
   "host_permissions": ["https://x.com/*", "https://twitter.com/*"],
   "icons": {
-    "16": "logo.svg",
-    "32": "logo.svg",
-    "48": "logo.svg",
-    "128": "logo.svg"
+    "16": "assets/logo.svg",
+    "32": "assets/logo.svg",
+    "48": "assets/logo.svg",
+    "128": "assets/logo.svg"
   },
   "action": {
     "default_popup": "popup.html",
