@@ -1,6 +1,9 @@
 {
   "name": "twitter-account-location",
   "version": "1.0.0",
+  "scripts": {
+    "lint": "eslint --ext .js src"
+  },
   "devDependencies": {
     "eslint": "^8.50.0"
   }
