@@ -728,17 +728,11 @@ async function processUsernames() {
     'article[data-testid="tweet"], [data-testid="UserCell"], [data-testid="User-Names"], [data-testid="User-Name"]'
   );
 
-  let foundCount = 0;
-  let processedCount = 0;
-  let skippedCount = 0;
-
   for (const container of containers) {
     const screenName = extractUsername(container);
     if (screenName) {
-      foundCount++;
       // Process if not already added
       if (container.dataset.locationAdded !== "true") {
-        processedCount++;
         // Process in parallel but limit concurrency
         addLocationToUsername(container, screenName).catch((err) => {
           console.error(`Error processing ${screenName}:`, err);
@@ -746,8 +740,6 @@ async function processUsernames() {
           delete container.dataset.locationAdded;
           delete container.dataset.locationWaiting;
         });
-      } else {
-        skippedCount++;
       }
     } else {
       // do nothing
