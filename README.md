@@ -5,6 +5,7 @@
 
   <p>
     <a href="https://addons.mozilla.org/uk/firefox/addon/twitter-account-location/"><img src="https://img.shields.io/amo/v/twitter-account-location?label=Firefox%20Add-on" alt="Get it on Firefox Add-ons"></a>
+    <a href="https://chromewebstore.google.com/detail/twitter-account-location/mhfejoclbhjgkhmlapfhgpepdmnmanhi"><img src="https://img.shields.io/chrome-web-store/v/mhfejoclbhjgkhmlapfhgpepdmnmanhi?label=Chrome%20Web%20Store" alt="Get it on Chrome Web Store"></a>
     <a href="https://github.com/mamantoha/twitter-account-location/releases"><img src="https://img.shields.io/github/release/mamantoha/twitter-account-location.svg" alt="GitHub release"></a>
     <a href="https://github.com/mamantoha/twitter-account-location/blob/main/LICENSE"><img src="https://img.shields.io/github/license/mamantoha/twitter-account-location.svg" alt="License"></a>
   </p>
@@ -21,6 +22,7 @@
       - [From Firefox Add-ons](#from-firefox-add-ons)
       - [Manual Installation](#manual-installation)
     - [Chrome](#chrome)
+      - [From Chrome Web Store](#from-chrome-web-store)
       - [Manual Installation](#manual-installation-1)
   - [How It Works](#how-it-works)
   - [Technical Details](#technical-details)
@@ -59,6 +61,11 @@
 4. The extension will be loaded temporarily and will remain active until Firefox is restarted.
 
 ### Chrome
+
+#### From Chrome Web Store
+
+1. Visit the [Chrome Web Store page](https://chromewebstore.google.com/detail/twitter-account-location/mhfejoclbhjgkhmlapfhgpepdmnmanhi).
+2. Click **Add to Chrome** and follow the prompts.
 
 #### Manual Installation
 
