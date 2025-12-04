@@ -98,7 +98,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Inject script into page context to access fetch with proper cookies
 function injectPageScript() {
   const script = document.createElement("script");
-  script.src = browser.runtime.getURL("pageScript.js");
+  script.src = browser.runtime.getURL("src/pageScript.js");
   script.onload = function () {
     this.remove();
   };

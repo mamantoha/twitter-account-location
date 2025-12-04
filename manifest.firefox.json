@@ -16,18 +16,18 @@
     "default_title": "Twitter Location"
   },
   "background": {
-    "scripts": ["background.js"]
+    "scripts": ["src/background.js"]
   },
   "content_scripts": [
     {
       "matches": ["https://x.com/*"],
-      "js": ["cacheManager.js", "content.js"],
+      "js": ["src/cacheManager.js", "src/content.js"],
       "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["pageScript.js"],
+      "resources": ["src/pageScript.js"],
       "matches": ["https://x.com/*"]
     }
   ],
