@@ -676,10 +676,7 @@ async function addLocationToUsername(usernameElement, screenName) {
       delete usernameElement.dataset.locationWaiting;
 
       // Also mark any other containers waiting for this username
-      const waitingContainers = document.querySelectorAll(
-        `[data-location-waiting="true"]`
-      );
-      waitingContainers.forEach((container) => {
+      document.querySelectorAll(`[data-location-waiting="true"]`).forEach((container) => {
         const waitingUsername = extractUsername(container);
         if (waitingUsername === screenName) {
           // Clear waiting flag and add location to this container too
@@ -709,22 +706,12 @@ async function addLocationToUsername(usernameElement, screenName) {
 
 // Function to remove all locations (when extension is disabled)
 function removeAllLocations() {
-  const locations = document.querySelectorAll("[data-twitter-location]");
-  locations.forEach((loc) => loc.remove());
-
-  // Also remove any loading spinners
-  const spinners = document.querySelectorAll("[data-twitter-location-spinner]");
-  spinners.forEach((spinner) => spinner.remove());
-
-  // Reset location added markers
-  const addedContainers = document.querySelectorAll("[data-location-added]");
-  addedContainers.forEach((container) => {
+  document.querySelectorAll("[data-twitter-location]").forEach((loc) => loc.remove());
+  document.querySelectorAll("[data-twitter-location-spinner]").forEach((spinner) => spinner.remove());
+  document.querySelectorAll("[data-location-added]").forEach((container) => {
     delete container.dataset.locationAdded;
   });
-  const waitingContainers = document.querySelectorAll(
-    "[data-location-waiting]"
-  );
-  waitingContainers.forEach((container) => {
+  document.querySelectorAll("[data-location-waiting]").forEach((container) => {
     delete container.dataset.locationWaiting;
   });
 }
@@ -768,76 +755,43 @@ async function processUsernames() {
   }
 }
 
-// Initialize observer for dynamically loaded content
-function initObserver() {
+// Observe dynamically added nodes (for infinite scroll)
+function observeDynamicContent() {
   if (observer) {
     observer.disconnect();
   }
 
   observer = new MutationObserver((mutations) => {
-    // Don't process if extension is disabled
-    if (!extensionEnabled) {
-      return;
-    }
-
-    let shouldProcess = false;
     for (const mutation of mutations) {
       if (mutation.addedNodes.length > 0) {
-        shouldProcess = true;
-        break;
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === 1) {
+            // Element nodes only
+            processUsernames();
+          }
+        });
       }
-    }
-
-    if (shouldProcess) {
-      // Debounce processing
-      setTimeout(processUsernames, 500);
     }
   });
 
+  // Observe the body or a specific container
   observer.observe(document.body, {
     childList: true,
     subtree: true,
   });
 }
 
-// Main initialization
-async function init() {
-  // Load enabled state first
+// Initial setup
+(async () => {
+  // Load enabled state
   await loadEnabledState();
 
-  // Load persistent cache
-  await cacheManager.loadCache();
-
-  // Only proceed if extension is enabled
-  if (!extensionEnabled) {
-    return;
-  }
-
-  // Inject page script
+  // Inject the page script for fetch access
   injectPageScript();
 
-  // Wait a bit for page to fully load
-  setTimeout(() => {
-    processUsernames();
-  }, 2000);
+  // Process usernames on initial load
+  processUsernames();
 
-  // Set up observer for new content
-  initObserver();
-
-  // Re-process on navigation (Twitter uses SPA)
-  let lastUrl = location.href;
-  new MutationObserver(() => {
-    const url = location.href;
-    if (url !== lastUrl) {
-      lastUrl = url;
-      setTimeout(processUsernames, 2000);
-    }
-  }).observe(document, { subtree: true, childList: true });
-}
-
-// Wait for page to load
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init);
-} else {
-  init();
-}
+  // Observe dynamic content
+  observeDynamicContent();
+})();
