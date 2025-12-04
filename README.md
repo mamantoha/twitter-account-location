@@ -1,80 +1,48 @@
-<div align="center">
-  <img src="assets/logo.svg" alt="logo" width="80" height="80"/>
-  <h1>Twitter Account Location</h1>
-  <h3>A browser extension that displays account-based location information next to Twitter/X usernames.</h3>
+# Twitter Account Location
 
-  <p>
-    <a href="https://addons.mozilla.org/uk/firefox/addon/twitter-account-location/"><img src="https://img.shields.io/amo/v/twitter-account-location?label=Firefox%20Add-on" alt="Get it on Firefox Add-ons"></a>
-    <a href="https://chromewebstore.google.com/detail/twitter-account-location/mhfejoclbhjgkhmlapfhgpepdmnmanhi"><img src="https://img.shields.io/chrome-web-store/v/mhfejoclbhjgkhmlapfhgpepdmnmanhi?label=Chrome%20Web%20Store" alt="Get it on Chrome Web Store"></a>
-    <a href="https://github.com/mamantoha/twitter-account-location/releases"><img src="https://img.shields.io/github/release/mamantoha/twitter-account-location.svg" alt="GitHub release"></a>
-    <a href="https://github.com/mamantoha/twitter-account-location/blob/main/LICENSE"><img src="https://img.shields.io/github/license/mamantoha/twitter-account-location.svg" alt="License"></a>
-  </p>
-</div>
+A browser extension that displays account-based location information next to Twitter/X usernames.
+
+[![Firefox Add-on](https://img.shields.io/amo/v/twitter-account-location?label=Firefox%20Add-on)](https://addons.mozilla.org/uk/firefox/addon/twitter-account-location/)
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/mhfejoclbhjgkhmlapfhgpepdmnmanhi?label=Chrome%20Web%20Store)](https://chromewebstore.google.com/detail/twitter-account-location/mhfejoclbhjgkhmlapfhgpepdmnmanhi)
+[![GitHub release](https://img.shields.io/github/release/mamantoha/twitter-account-location.svg)](https://github.com/mamantoha/twitter-account-location/releases)
+[![License](https://img.shields.io/github/license/mamantoha/twitter-account-location.svg)](https://github.com/mamantoha/twitter-account-location/blob/main/LICENSE)
 
 ---
 
-# Table of Contents
-
-- [Table of Contents](#table-of-contents)
-  - [Features](#features)
-  - [Installation](#installation)
-    - [Firefox](#firefox)
-      - [From Firefox Add-ons](#from-firefox-add-ons)
-      - [Manual Installation](#manual-installation)
-    - [Chrome](#chrome)
-      - [From Chrome Web Store](#from-chrome-web-store)
-      - [Manual Installation](#manual-installation-1)
-  - [How It Works](#how-it-works)
-  - [Technical Details](#technical-details)
-  - [API Endpoint](#api-endpoint)
-  - [Limitations](#limitations)
-  - [Privacy](#privacy)
-  - [Troubleshooting](#troubleshooting)
-  - [Contributing](#contributing)
-  - [Support](#support)
-  - [License](#license)
-
-> **Note:** This project was originally forked from [RhysSullivan/twitter-account-location-in-username](https://github.com/RhysSullivan/twitter-account-location-in-username). It has since evolved to support both Firefox and Chrome, with additional features and improvements.
-
 ## Features
 
-- Automatically detects usernames on Twitter/X pages
-- Queries Twitter's GraphQL API to get account location information
-- Displays the account's provided location text next to usernames
-- Works with dynamically loaded content (infinite scroll)
-- Caches location data to minimize API calls
+- Detects usernames on Twitter/X pages
+- Queries Twitter's GraphQL API for location info
+- Displays location next to usernames
+- Works with infinite scroll
+- Caches location data for 30 days
 
 ## Installation
 
-### Firefox
+| Browser  | Method                | Link                                                                 |
+|----------|-----------------------|----------------------------------------------------------------------|
+| Firefox  | Add-on Store          | [Firefox Add-ons](https://addons.mozilla.org/uk/firefox/addon/twitter-account-location/) |
+| Chrome   | Web Store             | [Chrome Web Store](https://chromewebstore.google.com/detail/twitter-account-location/mhfejoclbhjgkhmlapfhgpepdmnmanhi) |
+| Both     | Manual (ZIP)          | [GitHub Releases](https://github.com/mamantoha/twitter-account-location/releases)         |
 
-#### From Firefox Add-ons
-
-1. Visit the [Firefox Add-ons page](https://addons.mozilla.org/uk/firefox/addon/twitter-account-location/).
-2. Click **Add to Firefox** and follow the prompts.
-
-#### Manual Installation
+### Manual Installation
 
 1. Clone or download this repository.
-2. In Firefox, open `about:debugging#/runtime/this-firefox`.
-3. Click **Load Temporary Add-on...** and select the `manifest.json` file from this repository (or any file inside the extension directory).
-4. The extension will be loaded temporarily and will remain active until Firefox is restarted.
+2. Follow the browser-specific steps below:
 
-### Chrome
+#### Firefox
 
-#### From Chrome Web Store
+- In Firefox, open `about:debugging#/runtime/this-firefox`.
+- Click **Load Temporary Add-on...** and select the `manifest.json` file from this repository (or any file inside the extension directory).
+- The extension will be loaded temporarily and will remain active until Firefox is restarted.
 
-1. Visit the [Chrome Web Store page](https://chromewebstore.google.com/detail/twitter-account-location/mhfejoclbhjgkhmlapfhgpepdmnmanhi).
-2. Click **Add to Chrome** and follow the prompts.
+#### Chrome
 
-#### Manual Installation
-
-1. Download the latest Chrome ZIP from the [GitHub Releases page](https://github.com/mamantoha/twitter-account-location/releases).
-2. In Chrome, go to `chrome://extensions/`.
-3. Enable **Developer mode** (toggle in the top right).
-4. Drag and drop the ZIP file onto the extensions page.
-5. The extension will be installed and appear in your Chrome extensions list.
-6. To update, remove the old version and repeat these steps with the new ZIP.
+- In Chrome, go to `chrome://extensions/`.
+- Enable **Developer mode** (toggle in the top right).
+- Drag and drop the downloaded ZIP file onto the extensions page.
+- The extension will be installed and appear in your Chrome extensions list.
+- To update, remove the old version and repeat these steps with the new ZIP.
 
 ## How It Works
 
@@ -94,14 +62,6 @@
 - **Content Script Communication:** The content script listens for location fetch requests. When a username is detected, it sends a custom event to the page script, which makes the API request and returns the location data.
 
 - **Caching:** Location data is cached in your browser's IndexedDB and expires automatically after 30 days to minimize API calls and improve performance.
-
-- **Files:**
-  - `manifest.json` — WebExtension manifest
-  - `content.js` — Main content script that processes the page and injects page scripts for API calls
-  - `cacheManager.js` — Handles caching logic (IndexedDB)
-  - `pageScript.js` — Injected script for API requests
-  - `popup.html`, `popup.js` — Extension popup UI
-  - `README.md` — This file
 
 ## API Endpoint
 
