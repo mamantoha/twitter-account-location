@@ -1,0 +1,24 @@
+{
+  "name": "twitter-account-location",
+  "version": "1.0.0",
+  "description": "A browser extension that displays account-based location information next to Twitter/X usernames.",
+  "main": "background.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mamantoha/twitter-account-location.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/mamantoha/twitter-account-location/issues"
+  },
+  "homepage": "https://github.com/mamantoha/twitter-account-location#readme",
+  "devDependencies": {
+    "eslint": "^8.50.0"
+  }
+}

@@ -300,7 +300,7 @@ function extractUsername(element) {
 
     for (const link of links) {
       const href = link.getAttribute("href");
-      const match = href.match(/^\/([^\/\?]+)/);
+      const match = href.match(/^\/([^/?]+)/);
       if (match && match[1]) {
         const username = match[1];
 
@@ -327,7 +327,7 @@ function extractUsername(element) {
     const href = link.getAttribute("href");
     if (!href) continue;
 
-    const match = href.match(/^\/([^\/\?]+)/);
+    const match = href.match(/^\/([^/?]+)/);
     if (!match || !match[1]) continue;
 
     const potentialUsername = match[1];
@@ -560,7 +560,7 @@ async function addLocationToUsername(usernameElement, screenName) {
     // Tooltip/modal logic with robust hover
     let tooltip = null;
     let hideTimeout = null;
-    function showTooltip() {
+    const showTooltip = () => {
       if (tooltip) return;
       (async () => {
         document.querySelectorAll('.twitter-location-tooltip').forEach((el) => el.remove());
@@ -642,13 +642,13 @@ async function addLocationToUsername(usernameElement, screenName) {
           hideTimeout = setTimeout(hideTooltip, 80);
         });
       })();
-    }
-    function hideTooltip() {
+    };
+    const hideTooltip = () => {
       if (tooltip) {
         tooltip.remove();
         tooltip = null;
       }
-    }
+    };
     locationSpan.addEventListener('mouseenter', () => {
       if (hideTimeout) clearTimeout(hideTimeout);
       showTooltip();
