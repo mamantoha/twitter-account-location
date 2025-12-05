@@ -166,7 +166,7 @@
           );
           return;
         } else {
-          const errorText = await response.text().catch(() => "");
+          await response.text().catch(() => "");
 
           // Handle rate limiting
           if (response.status === 429) {

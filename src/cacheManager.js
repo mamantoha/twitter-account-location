@@ -1,4 +1,5 @@
 // Polyfill: use chrome if browser is undefined (for Chrome compatibility)
+/* exported cacheManager */
 if (typeof browser === "undefined") {
   var browser = chrome;
 }
@@ -138,4 +139,6 @@ class CacheManager {
 }
 
 // Create a global instance
+/* eslint-disable no-unused-vars */
 const cacheManager = new CacheManager();
+/* eslint-enable no-unused-vars */
