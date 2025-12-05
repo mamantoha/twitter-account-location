@@ -310,9 +310,8 @@ function extractUsername(element) {
           !username.startsWith("hashtag") &&
           !username.startsWith("search") &&
           username.length > 0 &&
-          username.length < 20
+          username.length <= 15
         ) {
-          // Usernames are typically short
           return username;
         }
       }
