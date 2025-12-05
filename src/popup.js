@@ -7,10 +7,10 @@ if (typeof browser === "undefined") {
 const TOGGLE_KEY = "extension_enabled";
 const DEFAULT_ENABLED = true;
 
-const toggleSwitch = document.getElementById("toggleSwitch");
+const toggleSwitchEl = document.getElementById("toggleSwitch");
 const statusEl = document.getElementById("status");
-const cacheInfo = document.getElementById("cacheInfo");
-const rateLimitInfo = document.getElementById("rateLimitInfo");
+const cacheInfoEl = document.getElementById("cacheInfo");
+const rateLimitInfoEl = document.getElementById("rateLimitInfo");
 
 // Load current state
 (async function initPopup() {
@@ -58,20 +58,20 @@ async function updateRateLimitInfo() {
         } else {
           text += "Unknown";
         }
-        rateLimitInfo.textContent = text;
+        rateLimitInfoEl.textContent = text;
       } else {
-        rateLimitInfo.textContent = "API Rate Limit: Unable to load";
+        rateLimitInfoEl.textContent = "API Rate Limit: Unable to load";
       }
     } else {
-      rateLimitInfo.textContent = "API Rate Limit: No active tab";
+      rateLimitInfoEl.textContent = "API Rate Limit: No active tab";
     }
   } catch (e) {
     console.error("Error getting rate limit info:", e);
-    rateLimitInfo.textContent = "API Rate Limit: Error";
+    rateLimitInfoEl.textContent = "API Rate Limit: Error";
   }
 }
 // Toggle click handler
-toggleSwitch.addEventListener("click", async () => {
+toggleSwitchEl.addEventListener("click", async () => {
   try {
     const result = await browser.storage.local.get([TOGGLE_KEY]);
     const currentState =
@@ -103,11 +103,11 @@ toggleSwitch.addEventListener("click", async () => {
 
 function updateToggle(isEnabled) {
   if (isEnabled) {
-    toggleSwitch.classList.add("enabled");
+    toggleSwitchEl.classList.add("enabled");
     statusEl.textContent = "Extension is enabled";
     statusEl.style.color = "#1d9bf0";
   } else {
-    toggleSwitch.classList.remove("enabled");
+    toggleSwitchEl.classList.remove("enabled");
     statusEl.textContent = "Extension is disabled";
     statusEl.style.color = "#536471";
   }
@@ -124,15 +124,15 @@ async function updateCacheCount() {
         type: "getCacheCount",
       });
       if (response && typeof response.count === "number") {
-        cacheInfo.textContent = `Cached locations: ${response.count}`;
+        cacheInfoEl.textContent = `Cached locations: ${response.count}`;
       } else {
-        cacheInfo.textContent = "Cached locations: Unable to load";
+        cacheInfoEl.textContent = "Cached locations: Unable to load";
       }
     } else {
-      cacheInfo.textContent = "Cached locations: No active tab";
+      cacheInfoEl.textContent = "Cached locations: No active tab";
     }
   } catch (e) {
     console.error("Error getting cache count:", e);
-    cacheInfo.textContent = "Cached locations: Error";
+    cacheInfoEl.textContent = "Cached locations: Error";
   }
 }
