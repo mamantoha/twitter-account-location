@@ -376,7 +376,7 @@ function extractUsername(element) {
       // If it's in a UserName container and looks like a username, return it
       if (
         potentialUsername.length > 0 &&
-        potentialUsername.length < 20 &&
+        potentialUsername.length <= 15 &&
         !potentialUsername.includes("/")
       ) {
         return potentialUsername;
