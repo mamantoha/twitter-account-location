@@ -8,7 +8,7 @@ const TOGGLE_KEY = "extension_enabled";
 const DEFAULT_ENABLED = true;
 
 const toggleSwitch = document.getElementById("toggleSwitch");
-const status = document.getElementById("status");
+const statusEl = document.getElementById("status");
 const cacheInfo = document.getElementById("cacheInfo");
 const rateLimitInfo = document.getElementById("rateLimitInfo");
 
@@ -104,12 +104,12 @@ toggleSwitch.addEventListener("click", async () => {
 function updateToggle(isEnabled) {
   if (isEnabled) {
     toggleSwitch.classList.add("enabled");
-    status.textContent = "Extension is enabled";
-    status.style.color = "#1d9bf0";
+    statusEl.textContent = "Extension is enabled";
+    statusEl.style.color = "#1d9bf0";
   } else {
     toggleSwitch.classList.remove("enabled");
-    status.textContent = "Extension is disabled";
-    status.style.color = "#536471";
+    statusEl.textContent = "Extension is disabled";
+    statusEl.style.color = "#536471";
   }
 }
 
