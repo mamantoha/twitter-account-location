@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Twitter Account Location",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Show account based location",
   "permissions": ["activeTab", "storage", "tabs"],
   "host_permissions": ["https://x.com/*"],
@@ -12,22 +12,22 @@
     "128": "assets/logo.png"
   },
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "src/popup.html",
     "default_title": "Twitter Location"
   },
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "src/background.js"
   },
   "content_scripts": [
     {
       "matches": ["https://x.com/*"],
-      "js": ["cacheManager.js", "content.js"],
+      "js": ["src/cacheManager.js", "src/content.js"],
       "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["pageScript.js"],
+      "resources": ["src/pageScript.js"],
       "matches": ["https://x.com/*"]
     }
   ]

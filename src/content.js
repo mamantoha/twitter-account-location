@@ -98,7 +98,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 // Inject script into page context to access fetch with proper cookies
 function injectPageScript() {
   const script = document.createElement("script");
-  script.src = browser.runtime.getURL("pageScript.js");
+  script.src = browser.runtime.getURL("src/pageScript.js");
   script.onload = function () {
     this.remove();
   };
@@ -300,7 +300,7 @@ function extractUsername(element) {
 
     for (const link of links) {
       const href = link.getAttribute("href");
-      const match = href.match(/^\/([^\/\?]+)/);
+      const match = href.match(/^\/([^/?]+)/);
       if (match && match[1]) {
         const username = match[1];
 
@@ -310,9 +310,8 @@ function extractUsername(element) {
           !username.startsWith("hashtag") &&
           !username.startsWith("search") &&
           username.length > 0 &&
-          username.length < 20
+          username.length <= 15
         ) {
-          // Usernames are typically short
           return username;
         }
       }
@@ -327,7 +326,7 @@ function extractUsername(element) {
     const href = link.getAttribute("href");
     if (!href) continue;
 
-    const match = href.match(/^\/([^\/\?]+)/);
+    const match = href.match(/^\/([^/?]+)/);
     if (!match || !match[1]) continue;
 
     const potentialUsername = match[1];
@@ -377,7 +376,7 @@ function extractUsername(element) {
       // If it's in a UserName container and looks like a username, return it
       if (
         potentialUsername.length > 0 &&
-        potentialUsername.length < 20 &&
+        potentialUsername.length <= 15 &&
         !potentialUsername.includes("/")
       ) {
         return potentialUsername;
@@ -556,11 +555,12 @@ async function addLocationToUsername(usernameElement, screenName) {
     locationSpan.style.fontSize = "0.95em";
     locationSpan.style.fontWeight = "500";
     locationSpan.style.verticalAlign = "middle";
+    locationSpan.style.whiteSpace = "nowrap";
 
     // Tooltip/modal logic with robust hover
     let tooltip = null;
     let hideTimeout = null;
-    function showTooltip() {
+    const showTooltip = () => {
       if (tooltip) return;
       (async () => {
         document.querySelectorAll('.twitter-location-tooltip').forEach((el) => el.remove());
@@ -642,13 +642,13 @@ async function addLocationToUsername(usernameElement, screenName) {
           hideTimeout = setTimeout(hideTooltip, 80);
         });
       })();
-    }
-    function hideTooltip() {
+    };
+    const hideTooltip = () => {
       if (tooltip) {
         tooltip.remove();
         tooltip = null;
       }
-    }
+    };
     locationSpan.addEventListener('mouseenter', () => {
       if (hideTimeout) clearTimeout(hideTimeout);
       showTooltip();

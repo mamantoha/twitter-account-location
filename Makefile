@@ -1,5 +1,5 @@
 EXT_NAME=twitter_account_location
-EXT_VERSION=1.0.3
+EXT_VERSION=1.0.4
 DIST_DIR=dist/build
 FIREFOX_MANIFEST=manifest.firefox.json
 CHROME_MANIFEST=manifest.chrome.json
@@ -7,7 +7,7 @@ CHROME_MANIFEST=manifest.chrome.json
 FIREFOX_ZIP=$(DIST_DIR)/$(EXT_NAME)-v$(EXT_VERSION).firefox.zip
 CHROME_ZIP=$(DIST_DIR)/$(EXT_NAME)-v$(EXT_VERSION).chrome.zip
 
-EXT_FILES=background.js cacheManager.js content.js pageScript.js popup.html popup.js README.md LICENSE assets/*
+EXT_FILES=src/background.js src/cacheManager.js src/content.js src/pageScript.js src/popup.html src/popup.js README.md LICENSE assets/*
 
 all: firefox chrome
 

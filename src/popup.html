@@ -93,6 +93,18 @@
       margin-top: 12px;
       padding-top: 12px;
       border-top: 1px solid #eff3f4;
+
+      #extVersion {
+        display: block;
+        margin-top: 8px;
+      }
+
+      a#sourceCodeLink {
+        color: #1d9bf0;
+        display: block;
+        margin-top: 8px;
+        word-break: break-all;
+      }
     }
 
     @media (prefers-color-scheme: dark) {
@@ -135,8 +147,8 @@
   <div class="cache-info" id="rateLimitInfo">API Rate Limit: Loading...</div>
 
   <div class="info">
-    <span id="extVersion" style="display:block;margin-top:8px;"></span>
-    <a href="https://github.com/mamantoha/twitter-account-location" target="_blank" rel="noopener noreferrer" style="color:#1d9bf0;display:block;margin-top:8px;word-break:break-all;">Source code on GitHub</a>
+    <span id="extVersion"></span>
+    <a href="https://github.com/mamantoha/twitter-account-location" id="sourceCodeLink" target="_blank" rel="noopener noreferrer">Source code on GitHub</a>
   </div>
 
   <script src="popup.js"></script>

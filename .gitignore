@@ -16,5 +16,7 @@ Thumbs.db
 # Node modules (if you add build tools later)
 node_modules/
 
+package-lock.json
+
 dist/build/
 web-ext-artifacts/
