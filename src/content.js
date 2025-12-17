@@ -555,6 +555,7 @@ async function addLocationToUsername(usernameElement, screenName) {
     locationSpan.style.fontSize = "0.95em";
     locationSpan.style.fontWeight = "500";
     locationSpan.style.verticalAlign = "middle";
+    locationSpan.style.whiteSpace = "nowrap";
 
     // Tooltip/modal logic with robust hover
     let tooltip = null;
