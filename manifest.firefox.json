@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Twitter Account Location",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Show account based location",
   "permissions": ["activeTab", "storage", "tabs"],
   "host_permissions": ["https://x.com/*"],
