@@ -561,7 +561,7 @@ async function addLocationToUsername(usernameElement, screenName) {
       const parseRgb = (color) => {
         if (!color) return null;
         const match = color.match(
-          /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([0-9.]+))?\s*\)$/
+          /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([0-9]*\.?[0-9]+))?\s*\)$/
         );
         if (!match) return null;
         return {
