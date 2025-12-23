@@ -7,7 +7,7 @@ A browser extension that displays account-based location information next to Twi
 [![GitHub release](https://img.shields.io/github/release/mamantoha/twitter-account-location.svg)](https://github.com/mamantoha/twitter-account-location/releases)
 [![License](https://img.shields.io/github/license/mamantoha/twitter-account-location.svg)](https://github.com/mamantoha/twitter-account-location/blob/main/LICENSE)
 
----
+![Screenshot of Twitter Account Location extension in action](assets/screenshot.png)
 
 ## Features
 
