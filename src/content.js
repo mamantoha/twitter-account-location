@@ -36,6 +36,11 @@ let latestRateLimitInfo = {
 // Observer for dynamically loaded content
 let observer = null;
 
+// Cached theme styles for tooltip performance
+let cachedThemeStyles = null;
+let themeObserver = null;
+let themeDebounceTimer = null;
+
 // Extension enabled state
 let extensionEnabled = true;
 const TOGGLE_KEY = "extension_enabled";
@@ -131,6 +136,123 @@ function injectPageScript() {
         waitTime: event.data.waitTime,
       };
     }
+  });
+}
+
+// Compute tooltip theme styles from current Twitter/X theme
+function computeTooltipThemeStyles() {
+  const parseRgb = (color) => {
+    if (!color) return null;
+    const match = color.match(
+      /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([0-9]*\.?[0-9]+))?\s*\)$/
+    );
+    if (!match) return null;
+    return {
+      r: Number(match[1]),
+      g: Number(match[2]),
+      b: Number(match[3]),
+      a: match[4] === undefined ? 1 : Number(match[4]),
+    };
+  };
+
+  const isTransparent = (color) => {
+    if (!color || color === "transparent") return true;
+    const rgba = parseRgb(color);
+    return rgba ? rgba.a === 0 : false;
+  };
+
+  const pickBackgroundColor = () => {
+    const candidates = [
+      document.querySelector('[data-testid="primaryColumn"]'),
+      document.querySelector("main"),
+      document.body,
+      document.documentElement,
+    ].filter(Boolean);
+
+    for (const el of candidates) {
+      const bg = getComputedStyle(el).backgroundColor;
+      if (bg && !isTransparent(bg)) return bg;
+    }
+
+    return "rgb(255, 255, 255)";
+  };
+
+  const backgroundColor = pickBackgroundColor();
+  const textColor = getComputedStyle(document.body).color || "rgb(15, 20, 25)";
+
+  const bg = parseRgb(backgroundColor);
+  const text = parseRgb(textColor);
+
+  const brightness = bg
+    ? (bg.r * 299 + bg.g * 587 + bg.b * 114) / 1000
+    : 255;
+  const shadowAlpha = brightness > 180 ? 0.15 : 0.45;
+
+  const borderColor = text
+    ? `rgba(${text.r}, ${text.g}, ${text.b}, 0.2)`
+    : "rgba(127, 127, 127, 0.3)";
+
+  const accentColor =
+    getComputedStyle(document.documentElement)
+      .getPropertyValue("--color-primary")
+      .trim() || "#1d9bf0";
+
+  return {
+    backgroundColor,
+    textColor,
+    borderColor,
+    boxShadow: `0 4px 32px rgba(0, 0, 0, ${shadowAlpha})`,
+    accentColor,
+  };
+}
+
+// Initialize and cache theme styles
+function initializeThemeCache() {
+  // Compute initial theme styles
+  cachedThemeStyles = computeTooltipThemeStyles();
+
+  // Set up observer to detect theme changes
+  // Twitter/X typically changes theme by updating attributes on <html> or <body>
+  // or by modifying CSS variables on :root
+  if (themeObserver) {
+    themeObserver.disconnect();
+  }
+
+  // Cache DOM references for performance
+  const htmlElement = document.documentElement;
+  const bodyElement = document.body;
+
+  themeObserver = new MutationObserver((mutations) => {
+    // Check if any mutations affect theme-related attributes or styles
+    const themeChanged = mutations.some((mutation) => {
+      // Check for attribute changes on html/body (e.g., data-theme, style, class)
+      if (mutation.type === 'attributes' && 
+          (mutation.target === htmlElement || mutation.target === bodyElement)) {
+        return ['style', 'class', 'data-theme', 'data-color-mode'].includes(mutation.attributeName);
+      }
+      return false;
+    });
+
+    if (themeChanged) {
+      // Debounce theme updates to avoid excessive recalculation
+      if (themeDebounceTimer) {
+        clearTimeout(themeDebounceTimer);
+      }
+      themeDebounceTimer = setTimeout(() => {
+        cachedThemeStyles = computeTooltipThemeStyles();
+      }, 100);
+    }
+  });
+
+  // Observe both html and body for theme-related changes
+  themeObserver.observe(htmlElement, {
+    attributes: true,
+    attributeFilter: ['style', 'class', 'data-theme', 'data-color-mode'],
+  });
+  
+  themeObserver.observe(bodyElement, {
+    attributes: true,
+    attributeFilter: ['style', 'class', 'data-theme', 'data-color-mode'],
   });
 }
 
@@ -570,18 +692,20 @@ async function addLocationToUsername(usernameElement, screenName) {
 
         tooltip = document.createElement('div');
         tooltip.className = 'twitter-location-tooltip';
+        // Use cached theme styles for performance
+        const theme = cachedThemeStyles || computeTooltipThemeStyles();
         tooltip.style.position = 'absolute';
         tooltip.style.zIndex = 9999;
-        tooltip.style.background = '#181c20';
-        tooltip.style.color = '#e7e9ea';
+        tooltip.style.background = theme.backgroundColor;
+        tooltip.style.color = theme.textColor;
         tooltip.style.padding = '20px 24px';
         tooltip.style.borderRadius = '18px';
-        tooltip.style.boxShadow = '0 4px 32px rgba(0,0,0,0.45)';
+        tooltip.style.boxShadow = theme.boxShadow;
         tooltip.style.fontSize = '1em';
         tooltip.style.maxWidth = '340px';
         tooltip.style.pointerEvents = 'auto';
         tooltip.style.userSelect = 'text';
-        tooltip.style.border = '1px solid #333';
+        tooltip.style.border = `1px solid ${theme.borderColor}`;
 
         let html = "<div style='font-weight:700;font-size:1.15em;margin-bottom:18px;'>About this account</div>";
         html += `<div style='display:flex;align-items:center;margin-bottom:16px;'>`;
@@ -589,7 +713,7 @@ async function addLocationToUsername(usernameElement, screenName) {
           html += `<img src='${account.avatar.image_url.replace("_normal", "_bigger")}' style='width:48px;height:48px;border-radius:50%;margin-right:14px;'>`;
         }
         html += `<div><div style='font-weight:600;font-size:1.1em;'>${account.core?.name || ""}</div>`;
-        html += `<div style='color:#1d9bf0;'>@${account.core?.screen_name || ""}</div></div></div>`;
+        html += `<div style='color:${theme.accentColor};'>@${account.core?.screen_name || ""}</div></div></div>`;
 
         html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>📅</span><span>Joined ${account.core?.created_at ? new Date(account.core.created_at).toLocaleString('default', { month: 'long', year: 'numeric' }) : "Unknown"}</span></div>`;
 
@@ -780,6 +904,9 @@ function observeDynamicContent() {
 
   // Inject the page script for fetch access
   injectPageScript();
+
+  // Initialize theme cache for tooltip performance
+  initializeThemeCache();
 
   // Process usernames on initial load
   processUsernames();
