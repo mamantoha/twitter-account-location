@@ -39,6 +39,7 @@ let observer = null;
 // Cached theme styles for tooltip performance
 let cachedThemeStyles = null;
 let themeObserver = null;
+let themeDebounceTimer = null;
 
 // Extension enabled state
 let extensionEnabled = true;
@@ -143,7 +144,7 @@ function computeTooltipThemeStyles() {
   const parseRgb = (color) => {
     if (!color) return null;
     const match = color.match(
-      /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([0-9.]+))?\s*\)$/
+      /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([0-9]*\.?[0-9]+))?\s*\)$/
     );
     if (!match) return null;
     return {
@@ -217,12 +218,16 @@ function initializeThemeCache() {
     themeObserver.disconnect();
   }
 
+  // Cache DOM references for performance
+  const htmlElement = document.documentElement;
+  const bodyElement = document.body;
+
   themeObserver = new MutationObserver((mutations) => {
     // Check if any mutations affect theme-related attributes or styles
     const themeChanged = mutations.some((mutation) => {
       // Check for attribute changes on html/body (e.g., data-theme, style, class)
       if (mutation.type === 'attributes' && 
-          (mutation.target === document.documentElement || mutation.target === document.body)) {
+          (mutation.target === htmlElement || mutation.target === bodyElement)) {
         return ['style', 'class', 'data-theme', 'data-color-mode'].includes(mutation.attributeName);
       }
       return false;
@@ -230,22 +235,22 @@ function initializeThemeCache() {
 
     if (themeChanged) {
       // Debounce theme updates to avoid excessive recalculation
-      if (initializeThemeCache.debounceTimer) {
-        clearTimeout(initializeThemeCache.debounceTimer);
+      if (themeDebounceTimer) {
+        clearTimeout(themeDebounceTimer);
       }
-      initializeThemeCache.debounceTimer = setTimeout(() => {
+      themeDebounceTimer = setTimeout(() => {
         cachedThemeStyles = computeTooltipThemeStyles();
       }, 100);
     }
   });
 
   // Observe both html and body for theme-related changes
-  themeObserver.observe(document.documentElement, {
+  themeObserver.observe(htmlElement, {
     attributes: true,
     attributeFilter: ['style', 'class', 'data-theme', 'data-color-mode'],
   });
   
-  themeObserver.observe(document.body, {
+  themeObserver.observe(bodyElement, {
     attributes: true,
     attributeFilter: ['style', 'class', 'data-theme', 'data-color-mode'],
   });
