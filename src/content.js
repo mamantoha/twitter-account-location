@@ -71,7 +71,17 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "getRateLimitInfo") {
-    sendResponse(latestRateLimitInfo);
+    let queuedRequests = 0;
+    for (const callbacks of requestQueue.values()) {
+      queuedRequests += Array.isArray(callbacks) ? callbacks.length : 0;
+    }
+
+    sendResponse({
+      ...latestRateLimitInfo,
+      queueDistinct: requestQueue.size,
+      queueRequests: queuedRequests,
+      inFlight: inFlightRequests.size,
+    });
     return true;
   } else if (request.type === "extensionToggle") {
     extensionEnabled = request.enabled;
@@ -94,6 +104,48 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
         sendResponse({ count });
       } catch (e) {
         sendResponse({ count: 0 });
+      }
+    })();
+    return true;
+  } else if (request.type === "getAllCacheEntries") {
+    (async () => {
+      try {
+        if (typeof cacheManager === "undefined" || !cacheManager.getAllEntries) {
+          sendResponse({ entries: [] });
+          return;
+        }
+
+        const extractAvatarUrl = (account) => {
+          const url =
+            account?.data?.user_result_by_screen_name?.result?.avatar?.image_url;
+          if (typeof url === "string" && url.trim()) {
+            // Prefer a slightly larger avatar for the popup
+            return url.replace("_normal", "_bigger");
+          }
+          return null;
+        };
+
+        const extractLocationText = (account) => {
+          const location =
+            account?.data?.user_result_by_screen_name?.result?.about_profile
+              ?.account_based_in;
+          if (typeof location === "string" && location.trim()) {
+            return location.trim();
+          }
+          return "Unknown";
+        };
+
+        const rawEntries = await cacheManager.getAllEntries({ pruneExpired: true });
+        const entries = rawEntries.map((e) => ({
+          username: e.username,
+          cachedAt: e.cachedAt,
+          location: extractLocationText(e.account),
+          avatarUrl: extractAvatarUrl(e.account),
+        }));
+
+        sendResponse({ entries });
+      } catch (e) {
+        sendResponse({ entries: [] });
       }
     })();
     return true;
@@ -226,7 +278,7 @@ function initializeThemeCache() {
     // Check if any mutations affect theme-related attributes or styles
     const themeChanged = mutations.some((mutation) => {
       // Check for attribute changes on html/body (e.g., data-theme, style, class)
-      if (mutation.type === 'attributes' && 
+      if (mutation.type === 'attributes' &&
           (mutation.target === htmlElement || mutation.target === bodyElement)) {
         return ['style', 'class', 'data-theme', 'data-color-mode'].includes(mutation.attributeName);
       }
@@ -249,7 +301,7 @@ function initializeThemeCache() {
     attributes: true,
     attributeFilter: ['style', 'class', 'data-theme', 'data-color-mode'],
   });
-  
+
   themeObserver.observe(bodyElement, {
     attributes: true,
     attributeFilter: ['style', 'class', 'data-theme', 'data-color-mode'],
