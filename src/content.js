@@ -97,6 +97,37 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
     })();
     return true;
+  } else if (request.type === "getAllCacheEntries") {
+    (async () => {
+      try {
+        if (typeof cacheManager === "undefined" || !cacheManager.getAllEntries) {
+          sendResponse({ entries: [] });
+          return;
+        }
+
+        const extractLocationText = (account) => {
+          const location =
+            account?.data?.user_result_by_screen_name?.result?.about_profile
+              ?.account_based_in;
+          if (typeof location === "string" && location.trim()) {
+            return location.trim();
+          }
+          return "Unknown";
+        };
+
+        const rawEntries = await cacheManager.getAllEntries({ pruneExpired: true });
+        const entries = rawEntries.map((e) => ({
+          username: e.username,
+          cachedAt: e.cachedAt,
+          location: extractLocationText(e.account),
+        }));
+
+        sendResponse({ entries });
+      } catch (e) {
+        sendResponse({ entries: [] });
+      }
+    })();
+    return true;
   }
 });
 

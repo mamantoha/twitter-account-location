@@ -87,6 +87,57 @@ class CacheManager {
     }
   }
 
+  // Get all cached entries (filters expired entries and optionally prunes them)
+  async getAllEntries({ pruneExpired = true } = {}) {
+    try {
+      const db = await this.openDB();
+      const transaction = db.transaction([this.STORE_NAME], "readonly");
+      const store = transaction.objectStore(this.STORE_NAME);
+      const request = store.openCursor();
+
+      return await new Promise((resolve, reject) => {
+        const results = [];
+        const expiredKeys = [];
+        const now = Date.now();
+        const expiryMs = this.CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+
+        request.onsuccess = (event) => {
+          const cursor = event.target.result;
+          if (!cursor) {
+            db.close();
+            if (pruneExpired && expiredKeys.length > 0) {
+              Promise.allSettled(expiredKeys.map((key) => this.deleteEntry(key))).finally(
+                () => resolve(results)
+              );
+              return;
+            }
+            resolve(results);
+            return;
+          }
+
+          const username = cursor.key;
+          const value = cursor.value;
+
+          if (value && typeof value.cachedAt === "number" && value.cachedAt + expiryMs > now) {
+            results.push({ username, account: value.account, cachedAt: value.cachedAt });
+          } else {
+            expiredKeys.push(username);
+          }
+
+          cursor.continue();
+        };
+
+        request.onerror = () => {
+          db.close();
+          reject(request.error);
+        };
+      });
+    } catch (error) {
+      console.error("Error getting all cache entries:", error);
+      return [];
+    }
+  }
+
   // Save a cache entry to IndexedDB
   async saveCacheEntry(username, account) {
     if (!browser.runtime?.id) {

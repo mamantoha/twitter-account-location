@@ -107,6 +107,99 @@
       }
     }
 
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .tab-button {
+      flex: 1;
+      border: 1px solid #eff3f4;
+      background: transparent;
+      color: inherit;
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .tab-button.active {
+      border-color: #1d9bf0;
+      color: #1d9bf0;
+    }
+
+    .tab-panels {
+      margin-top: 10px;
+    }
+
+    .list {
+      max-height: 220px;
+      overflow: auto;
+      border: 1px solid #eff3f4;
+      border-radius: 10px;
+      padding: 8px;
+      background: #fff;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px;
+      border-radius: 8px;
+    }
+
+    .row + .row {
+      margin-top: 4px;
+    }
+
+    .left {
+      min-width: 0;
+      flex: 1 1 auto;
+    }
+
+    .handle {
+      font-weight: 700;
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .sub {
+      font-size: 12px;
+      color: #536471;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-top: 2px;
+    }
+
+    .count {
+      font-weight: 700;
+      font-size: 12px;
+      color: #1d9bf0;
+      flex: 0 0 auto;
+    }
+
+    .bar {
+      height: 6px;
+      background: #eff3f4;
+      border-radius: 999px;
+      margin-top: 6px;
+      overflow: hidden;
+    }
+
+    .bar > div {
+      height: 100%;
+      background: #1d9bf0;
+      border-radius: 999px;
+      width: 0;
+    }
+
     @media (prefers-color-scheme: dark) {
       body {
         background: #181c20;
@@ -127,6 +220,23 @@
         color: #8899a6;
         border-top: 1px solid #22262b;
       }
+
+      .tab-button {
+        border-color: #22262b;
+      }
+
+      .list {
+        border-color: #22262b;
+        background: #181c20;
+      }
+
+      .sub {
+        color: #8899a6;
+      }
+
+      .bar {
+        background: #22262b;
+      }
     }
   </style>
 </head>
@@ -146,11 +256,26 @@
   <div class="cache-info" id="cacheInfo">Cached locations: Loading...</div>
   <div class="cache-info" id="rateLimitInfo">API Rate Limit: Loading...</div>
 
+  <div class="tabs" role="tablist" aria-label="Cache views">
+    <button class="tab-button active" id="tabProfiles" role="tab" aria-selected="true" aria-controls="tabPanelProfiles" type="button">Profiles</button>
+    <button class="tab-button" id="tabStats" role="tab" aria-selected="false" aria-controls="tabPanelStats" type="button">Location stats</button>
+  </div>
+
+  <div class="tab-panels">
+    <div class="tab-panel" id="tabPanelProfiles" role="tabpanel" aria-labelledby="tabProfiles">
+      <div class="list" id="profilesList">Loading...</div>
+    </div>
+    <div class="tab-panel" id="tabPanelStats" role="tabpanel" aria-labelledby="tabStats" hidden>
+      <div class="list" id="countryStats">Loading...</div>
+    </div>
+  </div>
+
   <div class="info">
     <span id="extVersion"></span>
     <a href="https://github.com/mamantoha/twitter-account-location" id="sourceCodeLink" target="_blank" rel="noopener noreferrer">Source code on GitHub</a>
   </div>
 
+  <script src="cacheManager.js"></script>
   <script src="popup.js"></script>
 </body>
 
