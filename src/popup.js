@@ -18,6 +18,9 @@ const tabPanelProfilesEl = document.getElementById("tabPanelProfiles");
 const tabPanelStatsEl = document.getElementById("tabPanelStats");
 const profilesListEl = document.getElementById("profilesList");
 const countryStatsEl = document.getElementById("countryStats");
+const profilesSearchEl = document.getElementById("profilesSearch");
+
+let allCacheEntries = [];
 
 // Load current state
 (async function initPopup() {
@@ -38,11 +41,41 @@ const countryStatsEl = document.getElementById("countryStats");
 
     initializeTabs();
     await renderCacheViews();
+    initializeProfilesSearch();
   } catch (e) {
     console.error("Error loading toggle state in popup:", e);
     updateToggle(DEFAULT_ENABLED);
   }
 })();
+
+function initializeProfilesSearch() {
+  if (!profilesSearchEl) return;
+
+  const applyFilter = () => {
+    const query = (profilesSearchEl.value || "").trim().toLowerCase();
+    if (!query) {
+      renderProfiles(allCacheEntries);
+      return;
+    }
+
+    const filtered = (allCacheEntries || []).filter((e) => {
+      const username = String(e.username || "").toLowerCase();
+      const location = String(e.location || "").toLowerCase();
+      return username.includes(query) || location.includes(query);
+    });
+
+    renderProfiles(filtered, { isFiltered: true });
+  };
+
+  profilesSearchEl.addEventListener("input", applyFilter);
+
+  profilesSearchEl.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      profilesSearchEl.value = "";
+      applyFilter();
+    }
+  });
+}
 
 function initializeTabs() {
   if (!tabProfilesEl || !tabStatsEl) return;
@@ -100,15 +133,19 @@ async function renderCacheViews() {
 
   const entries = await loadAllCacheEntries();
 
+  allCacheEntries = entries;
+
   renderProfiles(entries);
   renderCountryStats(entries);
 }
 
-function renderProfiles(entries) {
+function renderProfiles(entries, { isFiltered = false } = {}) {
   if (!profilesListEl) return;
 
   if (!entries || entries.length === 0) {
-    profilesListEl.textContent = "No cached profiles.";
+    profilesListEl.textContent = isFiltered
+      ? "No matching profiles."
+      : "No cached profiles.";
     return;
   }
 

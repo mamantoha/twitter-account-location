@@ -134,6 +134,23 @@
       margin-top: 10px;
     }
 
+    .search {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #eff3f4;
+      border-radius: 10px;
+      padding: 8px 10px;
+      font-size: 12px;
+      background: #fff;
+      color: inherit;
+      outline: none;
+      margin-bottom: 8px;
+    }
+
+    .search::placeholder {
+      color: #536471;
+    }
+
     .list {
       max-height: 220px;
       overflow: auto;
@@ -242,6 +259,11 @@
         background: #181c20;
       }
 
+      .search {
+        border-color: #22262b;
+        background: #181c20;
+      }
+
       .sub {
         color: #8899a6;
       }
@@ -275,6 +297,7 @@
 
   <div class="tab-panels">
     <div class="tab-panel" id="tabPanelProfiles" role="tabpanel" aria-labelledby="tabProfiles">
+      <input class="search" id="profilesSearch" type="search" placeholder="Search profiles…" autocomplete="off" />
       <div class="list" id="profilesList">Loading...</div>
     </div>
     <div class="tab-panel" id="tabPanelStats" role="tabpanel" aria-labelledby="tabStats" hidden>
