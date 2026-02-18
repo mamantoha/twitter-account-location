@@ -120,9 +120,19 @@ function renderProfiles(entries) {
   for (const entry of sorted) {
     const username = entry.username;
     const locationText = entry.location || "Unknown";
+    const avatarUrl = entry.avatarUrl;
 
     const row = document.createElement("div");
-    row.className = "row";
+    row.className = "row profile-row";
+
+    if (avatarUrl) {
+      const avatar = document.createElement("img");
+      avatar.className = "avatar";
+      avatar.src = avatarUrl;
+      avatar.alt = "";
+      avatar.loading = "lazy";
+      row.appendChild(avatar);
+    }
 
     const left = document.createElement("div");
     left.className = "left";
