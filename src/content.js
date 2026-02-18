@@ -71,7 +71,17 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "getRateLimitInfo") {
-    sendResponse(latestRateLimitInfo);
+    let queuedRequests = 0;
+    for (const callbacks of requestQueue.values()) {
+      queuedRequests += Array.isArray(callbacks) ? callbacks.length : 0;
+    }
+
+    sendResponse({
+      ...latestRateLimitInfo,
+      queueDistinct: requestQueue.size,
+      queueRequests: queuedRequests,
+      inFlight: inFlightRequests.size,
+    });
     return true;
   } else if (request.type === "extensionToggle") {
     extensionEnabled = request.enabled;

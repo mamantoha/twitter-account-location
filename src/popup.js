@@ -273,6 +273,11 @@ async function updateRateLimitInfo() {
         } else {
           text += "Unknown";
         }
+
+        if (typeof response.queueDistinct === "number") {
+          text += ` | Queue: ${response.queueDistinct}`;
+        }
+
         rateLimitInfoEl.textContent = text;
       } else {
         rateLimitInfoEl.textContent = "API Rate Limit: Unable to load";
