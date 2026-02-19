@@ -28,14 +28,14 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: firefox-extension
-          path: dist/build/twitter_account_location-${{ github.ref_name }}.firefox.zip
+          path: dist/build/twitter_account_location-${{ github.event.release.tag_name }}.firefox.zip
 
       - name: Attach Firefox extension to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: dist/build/twitter_account_location-${{ github.ref_name }}.firefox.zip
-          asset_name: twitter_account_location-${{ github.ref_name }}.firefox.zip
+          file: dist/build/twitter_account_location-${{ github.event.release.tag_name }}.firefox.zip
+          asset_name: twitter_account_location-${{ github.event.release.tag_name }}.firefox.zip
           tag: ${{ github.ref }}
           overwrite: true
 
@@ -62,13 +62,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: chrome-extension
-          path: dist/build/twitter_account_location-${{ github.ref_name }}.chrome.zip
+          path: dist/build/twitter_account_location-${{ github.event.release.tag_name }}.chrome.zip
 
       - name: Attach Chrome extension to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: dist/build/twitter_account_location-${{ github.ref_name }}.chrome.zip
-          asset_name: twitter_account_location-${{ github.ref_name }}.chrome.zip
+          file: dist/build/twitter_account_location-${{ github.event.release.tag_name }}.chrome.zip
+          asset_name: twitter_account_location-${{ github.event.release.tag_name }}.chrome.zip
           tag: ${{ github.ref }}
           overwrite: true
