@@ -8,7 +8,6 @@ const TOGGLE_KEY = "extension_enabled";
 const DEFAULT_ENABLED = true;
 
 const toggleSwitchEl = document.getElementById("toggleSwitch");
-const statusEl = document.getElementById("status");
 const cacheInfoEl = document.getElementById("cacheInfo");
 const rateLimitInfoEl = document.getElementById("rateLimitInfo");
 const clearQueueButtonEl = document.getElementById("clearQueueButton");
@@ -354,12 +353,8 @@ toggleSwitchEl.addEventListener("click", async () => {
 function updateToggle(isEnabled) {
   if (isEnabled) {
     toggleSwitchEl.classList.add("enabled");
-    statusEl.textContent = "Extension is enabled";
-    statusEl.style.color = "#1d9bf0";
   } else {
     toggleSwitchEl.classList.remove("enabled");
-    statusEl.textContent = "Extension is disabled";
-    statusEl.style.color = "#536471";
   }
 }
 
