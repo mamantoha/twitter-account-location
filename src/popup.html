@@ -135,9 +135,28 @@
     .info .small-button {
       width: auto;
       margin-top: 0;
-      padding: 6px 8px;
+      padding: 6px;
       border-radius: 10px;
       flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 0;
+      background: #f7f9f9;
+    }
+
+    .info .small-button:hover {
+      background: #eff3f4;
+    }
+
+    .info .small-button:active {
+      background: #e7e9ea;
+    }
+
+    .info .small-button svg {
+      width: 18px;
+      height: 18px;
+      display: block;
     }
 
     #extVersion {
@@ -319,6 +338,18 @@
         border-color: #22262b;
       }
 
+      .info .small-button {
+        background: #22262b;
+      }
+
+      .info .small-button:hover {
+        background: #2a2e33;
+      }
+
+      .info .small-button:active {
+        background: #33383f;
+      }
+
       .sub {
         color: #8899a6;
       }
@@ -363,7 +394,11 @@
   </div>
 
   <div class="info">
-    <button class="small-button" id="clearQueueButton" type="button">Clear queue</button>
+    <button class="small-button" id="clearQueueButton" type="button" aria-label="Clear queue" title="Clear queue">
+      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+        <path d="M10 10V13M4 6H20M16 6L15.7294 5.18807C15.4671 4.40125 15.3359 4.00784 15.0927 3.71698C14.8779 3.46013 14.6021 3.26132 14.2905 3.13878C13.9376 3 13.523 3 12.6936 3H11.3064C10.477 3 10.0624 3 9.70951 3.13878C9.39792 3.26132 9.12208 3.46013 8.90729 3.71698C8.66405 4.00784 8.53292 4.40125 8.27064 5.18807L8 6M10 21H9C7.34315 21 6 19.6569 6 18V6M18 6V9M14 10V10.5M17 15.5V17H18.5M21 17C21 19.2091 19.2091 21 17 21C14.7909 21 13 19.2091 13 17C13 14.7909 14.7909 13 17 13C19.2091 13 21 14.7909 21 17Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </button>
     <span id="extVersion"></span>
   </div>
 
