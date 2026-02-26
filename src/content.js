@@ -25,6 +25,11 @@ let rateLimitResetTime = 0; // Unix timestamp when rate limit resets
 // Track in-flight network requests to avoid duplicate GraphQL calls for the same username
 const inFlightRequests = new Map();
 
+// Persisted queue (survives page reloads)
+const PERSISTED_QUEUE_KEY = "pending_usernames_queue";
+let persistedQueuedUsernames = new Set();
+let persistedQueueSaveTimer = null;
+
 // Store latest rate limit info
 let latestRateLimitInfo = {
   limit: null,
@@ -55,6 +60,74 @@ async function loadEnabledState() {
   } catch (error) {
     console.error("Error loading enabled state:", error);
     extensionEnabled = DEFAULT_ENABLED;
+  }
+}
+
+function schedulePersistedQueueSave() {
+  if (persistedQueueSaveTimer) {
+    clearTimeout(persistedQueueSaveTimer);
+  }
+
+  persistedQueueSaveTimer = setTimeout(async () => {
+    try {
+      await browser.storage.local.set({
+        [PERSISTED_QUEUE_KEY]: Array.from(persistedQueuedUsernames),
+      });
+    } catch (e) {
+      // Ignore persistence errors
+    }
+  }, 250);
+}
+
+function addToPersistedQueue(screenName) {
+  if (!screenName) return;
+  persistedQueuedUsernames.add(screenName);
+  schedulePersistedQueueSave();
+}
+
+function removeFromPersistedQueue(screenName) {
+  if (!screenName) return;
+  if (persistedQueuedUsernames.delete(screenName)) {
+    schedulePersistedQueueSave();
+  }
+}
+
+async function restorePersistedQueue() {
+  try {
+    const result = await browser.storage.local.get([PERSISTED_QUEUE_KEY]);
+    const list = Array.isArray(result[PERSISTED_QUEUE_KEY])
+      ? result[PERSISTED_QUEUE_KEY]
+      : [];
+
+    persistedQueuedUsernames = new Set(
+      list.filter((v) => typeof v === "string" && v.trim().length > 0)
+    );
+
+    // Drop items that are already cached
+    if (typeof cacheManager !== "undefined") {
+      for (const screenName of Array.from(persistedQueuedUsernames)) {
+        const cached = await cacheManager.getValue(screenName);
+        if (cached !== undefined) {
+          // If a record exists (even null), don't keep it pending forever
+          persistedQueuedUsernames.delete(screenName);
+        }
+      }
+    }
+
+    // Seed in-memory queue so future requests attach callbacks instead of duplicating
+    for (const screenName of persistedQueuedUsernames) {
+      if (!requestQueue.has(screenName)) {
+        requestQueue.set(screenName, []);
+      }
+    }
+
+    schedulePersistedQueueSave();
+
+    if (persistedQueuedUsernames.size > 0) {
+      processRequestQueue();
+    }
+  } catch (e) {
+    // Ignore restore errors
   }
 }
 
@@ -392,9 +465,17 @@ function makeAboutAccountQueryRequest(screenName) {
         // sending further requests for a while. Do not cache rate-limited failures.
         if (isRateLimited) {
           // Backoff is handled in the message listener for __rateLimitInfo
+          // Keep this username pending so it can be retried after reset.
+          addToPersistedQueue(screenName);
+          if (!requestQueue.has(screenName)) {
+            requestQueue.set(screenName, []);
+          }
+          processRequestQueue();
         } else {
           // Only cache if not rate limited (don't cache failures due to rate limiting)
           await cacheManager.saveCacheEntry(screenName, account || null);
+          // Request completed (success or non-rate-limited failure) so remove from persisted queue
+          removeFromPersistedQueue(screenName);
         }
 
         resolve(account);
@@ -437,6 +518,7 @@ async function getAboutAccount(screenName) {
     return new Promise((resolve, reject) => {
       if (!requestQueue.has(screenName)) {
         requestQueue.set(screenName, []);
+        addToPersistedQueue(screenName);
       }
       requestQueue.get(screenName).push({ resolve, reject });
       // If this is the first request for this screenName, start processing
@@ -959,6 +1041,9 @@ function observeDynamicContent() {
 
   // Initialize theme cache for tooltip performance
   initializeThemeCache();
+
+  // Restore any queued usernames from a previous page load
+  await restorePersistedQueue();
 
   // Process usernames on initial load
   processUsernames();
