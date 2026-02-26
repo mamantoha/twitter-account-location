@@ -11,6 +11,7 @@ const toggleSwitchEl = document.getElementById("toggleSwitch");
 const statusEl = document.getElementById("status");
 const cacheInfoEl = document.getElementById("cacheInfo");
 const rateLimitInfoEl = document.getElementById("rateLimitInfo");
+const clearQueueButtonEl = document.getElementById("clearQueueButton");
 
 const tabProfilesEl = document.getElementById("tabProfiles");
 const tabStatsEl = document.getElementById("tabStats");
@@ -42,11 +43,40 @@ let allCacheEntries = [];
     initializeTabs();
     await renderCacheViews();
     initializeProfilesSearch();
+    initializeClearQueueButton();
   } catch (e) {
     console.error("Error loading toggle state in popup:", e);
     updateToggle(DEFAULT_ENABLED);
   }
 })();
+
+function initializeClearQueueButton() {
+  if (!clearQueueButtonEl) return;
+
+  clearQueueButtonEl.addEventListener("click", async () => {
+    clearQueueButtonEl.disabled = true;
+    try {
+      const tabs = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+
+      if (!tabs[0]?.id) {
+        return;
+      }
+
+      await browser.tabs.sendMessage(tabs[0].id, {
+        type: "clearPersistedQueue",
+      });
+
+      await updateRateLimitInfo();
+    } catch (e) {
+      console.error("Error clearing queue:", e);
+    } finally {
+      clearQueueButtonEl.disabled = false;
+    }
+  });
+}
 
 function initializeProfilesSearch() {
   if (!profilesSearchEl) return;

@@ -29,6 +29,7 @@ const inFlightRequests = new Map();
 const PERSISTED_QUEUE_KEY = "pending_usernames_queue";
 let persistedQueuedUsernames = new Set();
 let persistedQueueSaveTimer = null;
+let queueClearEpoch = 0;
 
 // Store latest rate limit info
 let latestRateLimitInfo = {
@@ -89,6 +90,23 @@ function removeFromPersistedQueue(screenName) {
   if (!screenName) return;
   if (persistedQueuedUsernames.delete(screenName)) {
     schedulePersistedQueueSave();
+  }
+}
+
+async function clearPersistedQueue() {
+  queueClearEpoch += 1;
+  persistedQueuedUsernames.clear();
+  requestQueue.clear();
+
+  if (persistedQueueSaveTimer) {
+    clearTimeout(persistedQueueSaveTimer);
+    persistedQueueSaveTimer = null;
+  }
+
+  try {
+    await browser.storage.local.set({ [PERSISTED_QUEUE_KEY]: [] });
+  } catch (e) {
+    // Ignore persistence errors
   }
 }
 
@@ -155,6 +173,16 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
       queueRequests: queuedRequests,
       inFlight: inFlightRequests.size,
     });
+    return true;
+  } else if (request.type === "clearPersistedQueue") {
+    (async () => {
+      try {
+        await clearPersistedQueue();
+        sendResponse({ cleared: true });
+      } catch (e) {
+        sendResponse({ cleared: false });
+      }
+    })();
     return true;
   } else if (request.type === "extensionToggle") {
     extensionEnabled = request.enabled;
@@ -445,6 +473,7 @@ async function processRequestQueue() {
 function makeAboutAccountQueryRequest(screenName) {
   return new Promise((resolve, reject) => {
     const requestId = Date.now() + Math.random();
+    const requestEpoch = queueClearEpoch;
 
     // Listen for response via postMessage
     const handler = async (event) => {
@@ -466,11 +495,13 @@ function makeAboutAccountQueryRequest(screenName) {
         if (isRateLimited) {
           // Backoff is handled in the message listener for __rateLimitInfo
           // Keep this username pending so it can be retried after reset.
-          addToPersistedQueue(screenName);
-          if (!requestQueue.has(screenName)) {
-            requestQueue.set(screenName, []);
+          if (queueClearEpoch === requestEpoch) {
+            addToPersistedQueue(screenName);
+            if (!requestQueue.has(screenName)) {
+              requestQueue.set(screenName, []);
+            }
+            processRequestQueue();
           }
-          processRequestQueue();
         } else {
           // Only cache if not rate limited (don't cache failures due to rate limiting)
           await cacheManager.saveCacheEntry(screenName, account || null);
