@@ -250,6 +250,28 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
     })();
     return true;
+  } else if (request.type === "deleteCacheEntry") {
+    (async () => {
+      try {
+        const username =
+          typeof request.username === "string" ? request.username.trim() : "";
+        if (!username) {
+          sendResponse({ deleted: false });
+          return;
+        }
+
+        if (typeof cacheManager === "undefined" || !cacheManager.deleteEntry) {
+          sendResponse({ deleted: false });
+          return;
+        }
+
+        await cacheManager.deleteEntry(username);
+        sendResponse({ deleted: true });
+      } catch (e) {
+        sendResponse({ deleted: false });
+      }
+    })();
+    return true;
   }
 });
 

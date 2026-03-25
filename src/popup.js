@@ -80,21 +80,7 @@ function initializeClearQueueButton() {
 function initializeProfilesSearch() {
   if (!profilesSearchEl) return;
 
-  const applyFilter = () => {
-    const query = (profilesSearchEl.value || "").trim().toLowerCase();
-    if (!query) {
-      renderProfiles(allCacheEntries);
-      return;
-    }
-
-    const filtered = (allCacheEntries || []).filter((e) => {
-      const username = String(e.username || "").toLowerCase();
-      const location = String(e.location || "").toLowerCase();
-      return username.includes(query) || location.includes(query);
-    });
-
-    renderProfiles(filtered, { isFiltered: true });
-  };
+  const applyFilter = () => applyProfilesFilter();
 
   profilesSearchEl.addEventListener("input", applyFilter);
 
@@ -104,6 +90,53 @@ function initializeProfilesSearch() {
       applyFilter();
     }
   });
+}
+
+function applyProfilesFilter() {
+  const query = (profilesSearchEl?.value || "").trim().toLowerCase();
+  if (!query) {
+    renderProfiles(allCacheEntries);
+    return;
+  }
+
+  const filtered = (allCacheEntries || []).filter((e) => {
+    const username = String(e.username || "").toLowerCase();
+    const location = String(e.location || "").toLowerCase();
+    return username.includes(query) || location.includes(query);
+  });
+
+  renderProfiles(filtered, { isFiltered: true });
+}
+
+async function refreshCacheViews() {
+  await updateCacheCount();
+  await renderCacheViews();
+  applyProfilesFilter();
+}
+
+async function deleteCacheEntry(username) {
+  const cleaned = typeof username === "string" ? username.trim() : "";
+  if (!cleaned) return;
+
+  try {
+    const tabs = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+
+    if (!tabs[0]?.id) {
+      return;
+    }
+
+    await browser.tabs.sendMessage(tabs[0].id, {
+      type: "deleteCacheEntry",
+      username: cleaned,
+    });
+
+    await refreshCacheViews();
+  } catch (e) {
+    console.error("Error deleting cache entry:", e);
+  }
 }
 
 function initializeTabs() {
@@ -214,6 +247,26 @@ function renderProfiles(entries, { isFiltered = false } = {}) {
     left.appendChild(handle);
     left.appendChild(sub);
     row.appendChild(left);
+
+    if (username) {
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "icon-button";
+      deleteBtn.type = "button";
+      deleteBtn.setAttribute("aria-label", "Delete from cache");
+      deleteBtn.title = "Delete from cache";
+
+      deleteBtn.innerHTML =
+        '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><path d="M4 6H20M16 6L15.7294 5.18807C15.4671 4.40125 15.3359 4.00784 15.0927 3.71698C14.8779 3.46013 14.6021 3.26132 14.2905 3.13878C13.9376 3 13.523 3 12.6936 3H11.3064C10.477 3 10.0624 3 9.70951 3.13878C9.39792 3.26132 9.12208 3.46013 8.90729 3.71698C8.66405 4.00784 8.53292 4.40125 8.27064 5.18807L8 6M6 6V18C6 19.6569 7.34315 21 9 21H15C16.6569 21 18 19.6569 18 18V6M10 10V17M14 10V17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+      deleteBtn.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        deleteBtn.disabled = true;
+        await deleteCacheEntry(username);
+      });
+
+      row.appendChild(deleteBtn);
+    }
 
     fragment.appendChild(row);
   }

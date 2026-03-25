@@ -244,6 +244,40 @@
       justify-content: flex-start;
     }
 
+    .icon-button {
+      flex: 0 0 auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border-radius: 10px;
+      border: 1px solid #eff3f4;
+      background: #f7f9f9;
+      color: inherit;
+      cursor: pointer;
+    }
+
+    .icon-button:hover {
+      background: #eff3f4;
+    }
+
+    .icon-button:active {
+      background: #e7e9ea;
+    }
+
+    .icon-button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .icon-button svg {
+      width: 16px;
+      height: 16px;
+      display: block;
+    }
+
     .avatar {
       width: 28px;
       height: 28px;
@@ -356,6 +390,19 @@
 
       .bar {
         background: #22262b;
+      }
+
+      .icon-button {
+        border-color: #22262b;
+        background: #22262b;
+      }
+
+      .icon-button:hover {
+        background: #2a2e33;
+      }
+
+      .icon-button:active {
+        background: #33383f;
       }
     }
   </style>
