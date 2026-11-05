@@ -32,6 +32,12 @@ A browser extension that displays account-based location information next to Twi
 
 #### Firefox
 
+- From the repository folder, create the Firefox manifest:
+
+  ```sh
+  cp manifest.firefox.json manifest.json
+  ```
+
 - In Firefox, open `about:debugging#/runtime/this-firefox`.
 - Click **Load Temporary Add-on...** and select the `manifest.json` file from this repository (or any file inside the extension directory).
 - The extension will be loaded temporarily and will remain active until Firefox is restarted.
