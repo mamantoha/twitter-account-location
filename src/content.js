@@ -20,6 +20,7 @@ const EXCLUDED_ROUTES = [
 
 // Requests are coordinated in the background; these maps only track local callers.
 const inFlightRequests = new Map();
+const pendingLocationContainers = new WeakSet();
 const accountWaiters = new Map();
 let queueClearEpoch = 0;
 let renderEpoch = 0;
@@ -94,9 +95,6 @@ function clearLocalQueue() {
   activeCoordinatorToken = null;
   if (cancelActiveRequest) cancelActiveRequest();
   document.querySelectorAll("[data-twitter-location-spinner]").forEach((spinner) => spinner.remove());
-  document.querySelectorAll("[data-location-waiting]").forEach((container) => {
-    delete container.dataset.locationWaiting;
-  });
 }
 
 async function receiveSharedAccountResult(request) {
@@ -651,17 +649,11 @@ function insertElementNearHandle(container, screenName, element) {
 async function addLocationToUsername(usernameElement, screenName) {
   if (!extensionEnabled || clearedContainers.has(usernameElement)) return;
   const requestRenderEpoch = renderEpoch;
-  // Check if location already added
-  if (usernameElement.dataset.locationAdded === "true") {
+  // Deduplicate rendering per container while sharing the account lookup.
+  if (usernameElement.dataset.locationAdded === "true" || pendingLocationContainers.has(usernameElement)) {
     return;
   }
-
-  // If there's already an in-flight request for this username, mark this container
-  // as waiting and return — the successful request will update waiting containers.
-  if (inFlightRequests.has(screenName.toLowerCase())) {
-    usernameElement.dataset.locationWaiting = "true";
-    return;
-  }
+  pendingLocationContainers.add(usernameElement);
 
   // Find User-Name container for spinner/location placement
   let userNameContainer = usernameElement.querySelector(
@@ -872,25 +864,12 @@ async function addLocationToUsername(usernameElement, screenName) {
     if (inserted) {
       // Mark as processed
       usernameElement.dataset.locationAdded = "true";
-      // Clear waiting flag if present
-      delete usernameElement.dataset.locationWaiting;
-
-      // Also mark any other containers waiting for this username
-      document.querySelectorAll(`[data-location-waiting="true"]`).forEach((container) => {
-        const waitingUsername = extractUsername(container);
-        if (waitingUsername?.toLowerCase() === screenName.toLowerCase()) {
-          // Clear waiting flag and add location to this container too
-          delete container.dataset.locationWaiting;
-          addLocationToUsername(container, screenName).catch(() => {});
-        }
-      });
     } else {
       console.error(
         `✗ Failed to insert location for ${screenName} - tried all strategies`
       );
       // Remove any transient marks so this can be retried later
       delete usernameElement.dataset.locationAdded;
-      delete usernameElement.dataset.locationWaiting;
     }
   } catch (error) {
     console.error(`Error processing location for ${screenName}:`, error);
@@ -900,7 +879,8 @@ async function addLocationToUsername(usernameElement, screenName) {
     }
     // Remove transient marks so it can be retried later
     delete usernameElement.dataset.locationAdded;
-    delete usernameElement.dataset.locationWaiting;
+  } finally {
+    pendingLocationContainers.delete(usernameElement);
   }
 }
 
@@ -911,9 +891,6 @@ function removeAllLocations() {
   document.querySelectorAll("[data-twitter-location-spinner]").forEach((spinner) => spinner.remove());
   document.querySelectorAll("[data-location-added]").forEach((container) => {
     delete container.dataset.locationAdded;
-  });
-  document.querySelectorAll("[data-location-waiting]").forEach((container) => {
-    delete container.dataset.locationWaiting;
   });
 }
 
@@ -934,12 +911,11 @@ async function processUsernames(containers) {
     if (screenName) {
       // Process if not already added
       if (container.dataset.locationAdded !== "true") {
-        // Process in parallel but limit concurrency
+        // Render each container independently; account lookups are deduplicated.
         addLocationToUsername(container, screenName).catch((err) => {
           console.error(`Error processing ${screenName}:`, err);
           // Ensure transient marks are cleared so retry is possible
           delete container.dataset.locationAdded;
-          delete container.dataset.locationWaiting;
         });
       }
     } else {
