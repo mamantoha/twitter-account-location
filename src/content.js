@@ -625,6 +625,25 @@ function createLoadingSpinner() {
 
 // Unified helper to insert spinner or location in the same spot
 function insertElementNearHandle(container, screenName, element) {
+  if (container.getAttribute("data-testid") === "UserCell") {
+    const normalized = screenName.toLowerCase();
+    const handleLink = Array.from(container.querySelectorAll('a[href^="/"]')).find((link) => {
+      return usernameFromHref(link.getAttribute("href"))?.toLowerCase() === normalized &&
+        link.textContent?.trim().toLowerCase() === `@${normalized}`;
+    });
+    if (handleLink?.parentElement) {
+      const handleStyle = getComputedStyle(handleLink.querySelector("span") || handleLink);
+      element.style.display = "block";
+      element.style.margin = "2px 0 0";
+      element.style.fontFamily = handleStyle.fontFamily;
+      element.style.fontSize = handleStyle.fontSize;
+      element.style.maxWidth = "100%";
+      element.style.overflow = "hidden";
+      element.style.textOverflow = "ellipsis";
+      handleLink.parentElement.appendChild(element);
+      return true;
+    }
+  }
   // Try to insert before handle section (preferred)
   const handleSection = findHandleSection(container, screenName);
   if (handleSection && handleSection.parentNode) {
