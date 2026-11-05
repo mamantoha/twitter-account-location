@@ -7,7 +7,7 @@ if (typeof browser === "undefined") {
 class CacheManager {
   constructor() {
     this.DB_NAME = "TwitterLocationCache";
-    this.DB_VERSION = 1;
+    this.DB_VERSION = 2;
     this.STORE_NAME = "locations";
     this.CACHE_EXPIRY_DAYS = 30;
     this.MISSING_EXPIRY_DAYS = 1;
@@ -41,11 +41,39 @@ class CacheManager {
     return new Promise((resolve, reject) => {
       const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
       request.onerror = () => reject(request.error);
-      request.onsuccess = () => resolve(request.result);
+      request.onsuccess = () => {
+        const db = request.result;
+        db.onversionchange = () => db.close();
+        resolve(db);
+      };
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
         if (!db.objectStoreNames.contains(this.STORE_NAME)) {
           db.createObjectStore(this.STORE_NAME);
+          return;
+        }
+        if (event.oldVersion < 2) {
+          // Older releases stored handles with their original casing.
+          const store = event.target.transaction.objectStore(this.STORE_NAME);
+          const migration = store.openCursor();
+          migration.onsuccess = () => {
+            const cursor = migration.result;
+            if (!cursor) return;
+            if (typeof cursor.key !== "string" || cursor.key === cursor.key.toLowerCase()) {
+              cursor.continue();
+              return;
+            }
+            const username = cursor.key.toLowerCase();
+            const existing = store.get(username);
+            existing.onsuccess = () => {
+              if (!this.isValidEntry(existing.result) ||
+                  (this.isValidEntry(cursor.value) && cursor.value.cachedAt > existing.result.cachedAt)) {
+                store.put(cursor.value, username);
+              }
+              cursor.delete();
+              cursor.continue();
+            };
+          };
         }
       };
     });
@@ -53,6 +81,7 @@ class CacheManager {
 
   // Get a single cached value from IndexedDB
   async getValue(username) {
+    username = username.toLowerCase();
     let db;
     try {
       db = await this.openDB();
@@ -136,14 +165,14 @@ class CacheManager {
       return;
     }
     await this.runWriteTransaction((store) => {
-      store.put({ account: account, cachedAt: cachedAt }, username);
+      store.put({ account: account, cachedAt: cachedAt }, username.toLowerCase());
     });
   }
 
   // Delete a cache entry from IndexedDB
   async deleteEntry(username) {
     await this.runWriteTransaction((store) => {
-      store.delete(username);
+      store.delete(username.toLowerCase());
     });
   }
 }
