@@ -232,9 +232,6 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
       }
     })();
     return true;
-  } else if (request.type === "extensionToggle") {
-    updateEnabledState(request.enabled);
-    return;
   } else if (request.type === "getAllCacheEntries") {
     (async () => {
       try {

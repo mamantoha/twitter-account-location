@@ -146,11 +146,6 @@ class CacheManager {
       store.delete(username);
     });
   }
-
-  // Load cache from persistent storage (no-op since we don't need to preload anything now)
-  async loadCache() {
-    // Previously loaded final markers, but now we don't need to preload anything
-  }
 }
 
 // Create a global instance

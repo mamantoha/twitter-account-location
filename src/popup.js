@@ -56,6 +56,13 @@ const PROFILES_PAGE_SIZE = 100;
   await renderCacheViews();
 })();
 
+// A null result means there is no active tab to receive the message.
+async function sendToActiveTab(message) {
+  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+  if (!tabs[0]?.id) return null;
+  return browser.tabs.sendMessage(tabs[0].id, message);
+}
+
 function initializeClearQueueButton() {
   if (!clearQueueButtonEl) return;
 
@@ -63,15 +70,7 @@ function initializeClearQueueButton() {
     clearQueueButtonEl.disabled = true;
     popupStatusEl.textContent = "";
     try {
-      const tabs = await browser.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-
-      if (!tabs[0]?.id) throw new Error("No active tab available for clearing the queue");
-      const response = await browser.tabs.sendMessage(tabs[0].id, {
-        type: "clearPersistedQueue",
-      });
+      const response = await sendToActiveTab({ type: "clearPersistedQueue" });
       if (!response?.cleared) throw new Error("Queue clearing failed");
       popupStatusEl.textContent = "Queue cleared.";
       await updateRateLimitInfo();
@@ -140,32 +139,19 @@ function renderProfilesPage() {
   profilesPageInfoEl.textContent = `${start + 1}–${end} of ${filteredCacheEntries.length}`;
 }
 
-async function refreshCacheViews() {
-  await renderCacheViews();
-}
-
 async function deleteCacheEntry(username) {
   const cleaned = typeof username === "string" ? username.trim() : "";
   if (!cleaned) return;
 
   popupStatusEl.textContent = "";
   try {
-    const tabs = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
-
-    if (!tabs[0]?.id) {
-      throw new Error("No active tab available for cache deletion");
-    }
-
-    const response = await browser.tabs.sendMessage(tabs[0].id, {
+    const response = await sendToActiveTab({
       type: "deleteCacheEntry",
       username: cleaned,
     });
     if (!response?.deleted) throw new Error("Cache deletion failed");
 
-    await refreshCacheViews();
+    await renderCacheViews();
   } catch (e) {
     console.error("Error deleting cache entry:", e);
     popupStatusEl.textContent = "Unable to delete cached profile. Try again.";
@@ -211,16 +197,7 @@ function initializeTabs() {
 
 async function loadAllCacheEntries() {
   try {
-    const tabs = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
-
-    if (!tabs[0]?.id) {
-      return null;
-    }
-
-    const response = await browser.tabs.sendMessage(tabs[0].id, {
+    const response = await sendToActiveTab({
       type: "getAllCacheEntries",
     });
 
@@ -394,39 +371,29 @@ function renderCountryStats(entries) {
 
 async function updateRateLimitInfo() {
   try {
-    const tabs = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
-    if (tabs[0]) {
-      const response = await browser.tabs.sendMessage(tabs[0].id, {
-        type: "getRateLimitInfo",
-      });
-      if (response && typeof response === "object") {
-        let text = "API Rate Limit: ";
-        if (
-          response.limit !== null &&
-          response.remaining !== null &&
-          response.resetTime !== null
-        ) {
-          const resetDate = new Date(response.resetTime * 1000);
-          text += `${response.remaining} / ${
-            response.limit
-          } remaining. Reset: ${resetDate.toLocaleTimeString()}`;
-        } else {
-          text += "Unknown";
-        }
-
-        if (typeof response.queueDistinct === "number") {
-          text += ` | Queue: ${response.queueDistinct}`;
-        }
-
-        rateLimitInfoEl.textContent = text;
-      } else {
-        rateLimitInfoEl.textContent = "API Rate Limit: Unable to load";
-      }
-    } else {
+    const response = await sendToActiveTab({ type: "getRateLimitInfo" });
+    if (response === null) {
       rateLimitInfoEl.textContent = "API Rate Limit: No active tab";
+      return;
+    }
+    if (response && typeof response === "object") {
+      let text = "API Rate Limit: ";
+      if (
+        response.limit !== null &&
+        response.remaining !== null &&
+        response.resetTime !== null
+      ) {
+        const resetDate = new Date(response.resetTime * 1000);
+        text += `${response.remaining} / ${response.limit} remaining. Reset: ${resetDate.toLocaleTimeString()}`;
+      } else {
+        text += "Unknown";
+      }
+      if (typeof response.queueDistinct === "number") {
+        text += ` | Queue: ${response.queueDistinct}`;
+      }
+      rateLimitInfoEl.textContent = text;
+    } else {
+      rateLimitInfoEl.textContent = "API Rate Limit: Unable to load";
     }
   } catch (e) {
     console.error("Error getting rate limit info:", e);
@@ -447,21 +414,6 @@ toggleSwitchEl.addEventListener("click", async () => {
     updateToggle(newState);
     popupStatusEl.textContent = newState ? "Extension enabled." : "Extension disabled.";
 
-    // Notify content script to update
-    try {
-      const tabs = await browser.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-      if (tabs[0]) {
-        await browser.tabs.sendMessage(tabs[0].id, {
-          type: "extensionToggle",
-          enabled: newState,
-        });
-      }
-    } catch (e) {
-      // Tab might not have content script loaded yet or no permission; ignore
-    }
   } catch (error) {
     console.error("Error toggling extension state:", error);
     popupStatusEl.textContent = "Unable to change extension state. Try again.";
