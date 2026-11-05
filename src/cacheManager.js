@@ -75,53 +75,42 @@ class CacheManager {
     }
   }
 
-  // Get all cached entries (filters expired entries and optionally prunes them)
+  // Filter and optionally prune entries in the same transaction.
   async getAllEntries({ pruneExpired = true } = {}) {
+    let db;
     try {
-      const db = await this.openDB();
-      const transaction = db.transaction([this.STORE_NAME], "readonly");
+      db = await this.openDB();
+      const transaction = db.transaction([this.STORE_NAME], pruneExpired ? "readwrite" : "readonly");
       const store = transaction.objectStore(this.STORE_NAME);
       const request = store.openCursor();
 
       return await new Promise((resolve, reject) => {
         const results = [];
-        const expiredKeys = [];
         const now = Date.now();
+        transaction.oncomplete = () => resolve(results);
+        transaction.onerror = () => reject(transaction.error || new Error("Cache scan failed"));
+        transaction.onabort = () => reject(transaction.error || new Error("Cache scan aborted"));
+        request.onerror = () => reject(request.error);
 
         request.onsuccess = (event) => {
           const cursor = event.target.result;
-          if (!cursor) {
-            db.close();
-            if (pruneExpired && expiredKeys.length > 0) {
-              Promise.allSettled(expiredKeys.map((key) => this.deleteEntry(key))).finally(
-                () => resolve(results)
-              );
-              return;
-            }
-            resolve(results);
-            return;
-          }
+          if (!cursor) return;
 
           const username = cursor.key;
           const value = cursor.value;
-
           if (this.isValidEntry(value, now)) {
             results.push({ username, account: value.account, cachedAt: value.cachedAt });
-          } else {
-            expiredKeys.push(username);
+          } else if (pruneExpired) {
+            cursor.delete();
           }
-
           cursor.continue();
-        };
-
-        request.onerror = () => {
-          db.close();
-          reject(request.error);
         };
       });
     } catch (error) {
       console.error("Error getting all cache entries:", error);
       throw error;
+    } finally {
+      if (db) db.close();
     }
   }
 
