@@ -19,8 +19,16 @@ const tabPanelStatsEl = document.getElementById("tabPanelStats");
 const profilesListEl = document.getElementById("profilesList");
 const countryStatsEl = document.getElementById("countryStats");
 const profilesSearchEl = document.getElementById("profilesSearch");
+const profilesPaginationEl = document.getElementById("profilesPagination");
+const profilesPreviousEl = document.getElementById("profilesPrevious");
+const profilesNextEl = document.getElementById("profilesNext");
+const profilesPageInfoEl = document.getElementById("profilesPageInfo");
 
 let allCacheEntries = [];
+let filteredCacheEntries = [];
+let profilesPage = 0;
+let profilesFilterTimer = null;
+const PROFILES_PAGE_SIZE = 100;
 
 // Load current state
 (async function initPopup() {
@@ -41,6 +49,7 @@ let allCacheEntries = [];
     initializeTabs();
     await renderCacheViews();
     initializeProfilesSearch();
+    initializeProfilesPagination();
     initializeClearQueueButton();
   } catch (e) {
     console.error("Error loading toggle state in popup:", e);
@@ -79,32 +88,57 @@ function initializeClearQueueButton() {
 function initializeProfilesSearch() {
   if (!profilesSearchEl) return;
 
-  const applyFilter = () => applyProfilesFilter();
-
-  profilesSearchEl.addEventListener("input", applyFilter);
+  profilesSearchEl.addEventListener("input", () => {
+    clearTimeout(profilesFilterTimer);
+    profilesFilterTimer = setTimeout(applyProfilesFilter, 100);
+  });
 
   profilesSearchEl.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       profilesSearchEl.value = "";
-      applyFilter();
+      applyProfilesFilter();
     }
   });
 }
 
 function applyProfilesFilter() {
+  clearTimeout(profilesFilterTimer);
+  if (allCacheEntries === null) return;
   const query = (profilesSearchEl?.value || "").trim().toLowerCase();
-  if (!query) {
-    renderProfiles(allCacheEntries);
-    return;
-  }
-
-  const filtered = (allCacheEntries || []).filter((e) => {
+  filteredCacheEntries = !query ? allCacheEntries : allCacheEntries.filter((e) => {
     const username = String(e.username || "").toLowerCase();
     const location = String(e.location || "").toLowerCase();
     return username.includes(query) || location.includes(query);
   });
 
-  renderProfiles(filtered, { isFiltered: true });
+  profilesPage = 0;
+  renderProfilesPage();
+}
+
+function initializeProfilesPagination() {
+  profilesPreviousEl.addEventListener("click", () => {
+    if (profilesPage === 0) return;
+    profilesPage -= 1;
+    renderProfilesPage();
+  });
+  profilesNextEl.addEventListener("click", () => {
+    if ((profilesPage + 1) * PROFILES_PAGE_SIZE >= filteredCacheEntries.length) return;
+    profilesPage += 1;
+    renderProfilesPage();
+  });
+}
+
+function renderProfilesPage() {
+  const start = profilesPage * PROFILES_PAGE_SIZE;
+  const end = Math.min(start + PROFILES_PAGE_SIZE, filteredCacheEntries.length);
+  renderProfiles(filteredCacheEntries.slice(start, end), {
+    isFiltered: Boolean(profilesSearchEl?.value.trim()),
+  });
+  profilesListEl.scrollTop = 0;
+  profilesPaginationEl.hidden = filteredCacheEntries.length <= PROFILES_PAGE_SIZE;
+  profilesPreviousEl.disabled = profilesPage === 0;
+  profilesNextEl.disabled = end >= filteredCacheEntries.length;
+  profilesPageInfoEl.textContent = `${start + 1}–${end} of ${filteredCacheEntries.length}`;
 }
 
 async function refreshCacheViews() {
@@ -190,20 +224,22 @@ async function renderCacheViews() {
   if (!profilesListEl || !countryStatsEl) return;
 
   cacheInfoEl.textContent = "Cached locations: Loading...";
+  allCacheEntries = null;
+  filteredCacheEntries = [];
+  profilesPaginationEl.hidden = true;
   profilesListEl.textContent = "Loading...";
   countryStatsEl.textContent = "Loading...";
 
   const entries = await loadAllCacheEntries();
 
   if (entries === null) {
-    allCacheEntries = [];
     cacheInfoEl.textContent = "Cached locations: Unable to load";
     profilesListEl.textContent = "Unable to load cached profiles.";
     countryStatsEl.textContent = "Unable to load cache statistics.";
     return;
   }
 
-  allCacheEntries = entries;
+  allCacheEntries = [...entries].sort((a, b) => (b.cachedAt || 0) - (a.cachedAt || 0));
   cacheInfoEl.textContent = `Cached locations: ${entries.length}`;
 
   applyProfilesFilter();
@@ -220,12 +256,9 @@ function renderProfiles(entries, { isFiltered = false } = {}) {
     return;
   }
 
-  const sorted = [...entries].sort(
-    (a, b) => (b.cachedAt || 0) - (a.cachedAt || 0)
-  );
   const fragment = document.createDocumentFragment();
 
-  for (const entry of sorted) {
+  for (const entry of entries) {
     const username = entry.username;
     const locationText = entry.location || "Unknown";
     const avatarUrl = entry.avatarUrl;

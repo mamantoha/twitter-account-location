@@ -240,6 +240,19 @@
       border-radius: 8px;
     }
 
+    .profile-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 8px;
+      font-size: 11px;
+    }
+
+    .profile-pagination[hidden] {
+      display: none;
+    }
+
     .profile-row {
       justify-content: flex-start;
     }
@@ -433,6 +446,11 @@
       <div class="tab-panel" id="tabPanelProfiles" role="tabpanel" aria-labelledby="tabProfiles">
         <input class="search" id="profilesSearch" type="search" placeholder="Search profiles…" autocomplete="off" />
         <div class="list" id="profilesList">Loading...</div>
+        <div class="profile-pagination" id="profilesPagination" hidden>
+          <button class="icon-button" id="profilesPrevious" type="button" aria-label="Previous profiles page">←</button>
+          <span id="profilesPageInfo" aria-live="polite"></span>
+          <button class="icon-button" id="profilesNext" type="button" aria-label="Next profiles page">→</button>
+        </div>
       </div>
       <div class="tab-panel" id="tabPanelStats" role="tabpanel" aria-labelledby="tabStats" hidden>
         <div class="list" id="countryStats">Loading...</div>
