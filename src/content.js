@@ -310,6 +310,12 @@ function injectPageScript() {
         resetTime: event.data.resetTime,
         waitTime: event.data.waitTime,
       };
+      if (event.data.remaining === 0) {
+        const resetTime = event.data.resetTime;
+        rateLimitResetTime = Number.isFinite(resetTime) && resetTime > Date.now() / 1000
+          ? resetTime
+          : Math.floor(Date.now() / 1000) + 120;
+      }
     }
   });
 }
@@ -437,58 +443,37 @@ async function processRequestQueue() {
     return;
   }
 
-  // Check if we're rate limited
-  if (rateLimitResetTime > 0) {
-    const now = Math.floor(Date.now() / 1000);
-    if (now < rateLimitResetTime) {
-      const waitTime = (rateLimitResetTime - now) * 1000;
-
-      setTimeout(processRequestQueue, Math.min(waitTime, 60000)); // Check every minute max
-      return;
-    } else {
-      // Rate limit expired, reset
-      rateLimitResetTime = 0;
-    }
-  }
-
   isProcessingQueue = true;
 
-  while (requestQueue.size > 0) {
-    // Re-check rate limit before starting each request
-    if (rateLimitResetTime > 0) {
-      const nowSec = Math.floor(Date.now() / 1000);
-      if (nowSec < rateLimitResetTime) {
-        const waitTime = (rateLimitResetTime - nowSec) * 1000;
-        setTimeout(processRequestQueue, Math.min(waitTime, 60000));
-        break;
-      } else {
-        // Rate limit expired, reset and continue
-        rateLimitResetTime = 0;
+  try {
+    while (requestQueue.size > 0) {
+      // Re-check rate limit before starting each request.
+      const waitTime = rateLimitResetTime * 1000 - Date.now();
+      if (waitTime > 0) {
+        await new Promise((resolve) => setTimeout(resolve, Math.min(waitTime, 60000)));
+        continue;
       }
-    }
+      rateLimitResetTime = 0;
 
-    // Get the next screenName to process
-    const screenName = requestQueue.keys().next().value;
-    const callbacks = requestQueue.get(screenName);
+      // Get the next screenName to process
+      const screenName = requestQueue.keys().next().value;
+      const callbacks = requestQueue.get(screenName);
 
-    // Remove from queue
-    requestQueue.delete(screenName);
+      // Remove from queue
+      requestQueue.delete(screenName);
 
-    // Make the request
-    makeAboutAccountQueryRequest(screenName)
-      .then((location) => {
+      try {
+        const location = await makeAboutAccountQueryRequest(screenName);
         callbacks.forEach(({ resolve }) => resolve(location));
-      })
-      .catch((error) => {
+      } catch (error) {
         callbacks.forEach(({ reject }) => reject(error));
-      })
-      .finally(() => {
-        // Continue processing queue after a short pause
-        setTimeout(processRequestQueue, 200);
-      });
-  }
+      }
 
-  isProcessingQueue = false;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  } finally {
+    isProcessingQueue = false;
+  }
 }
 
 // Make actual API request
@@ -515,7 +500,10 @@ function makeAboutAccountQueryRequest(screenName) {
         // If the page signalled rate-limiting, trigger immediate backoff so we stop
         // sending further requests for a while. Do not cache rate-limited failures.
         if (isRateLimited) {
-          // Backoff is handled in the message listener for __rateLimitInfo
+          // Fall back to two minutes if the response did not provide a future reset.
+          if (rateLimitResetTime <= Date.now() / 1000) {
+            rateLimitResetTime = Math.floor(Date.now() / 1000) + 120;
+          }
           // Keep this username pending so it can be retried after reset.
           if (queueClearEpoch === requestEpoch) {
             addToPersistedQueue(screenName);
