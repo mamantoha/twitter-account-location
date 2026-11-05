@@ -3,6 +3,7 @@
   // Store headers from Twitter's own API calls
   let twitterHeaders = null;
   let headersReady = false;
+  const activeRequests = new Map();
 
   // Function to capture headers from a request
   function captureHeaders(headers) {
@@ -82,7 +83,12 @@
 
   // Listen for fetch requests from content script via postMessage
   window.addEventListener("message", async function (event) {
-    // Only accept messages from our extension
+    if (event.source !== window) return;
+    if (event.data?.type === "__cancelAboutAccountQuery") {
+      activeRequests.get(event.data.requestId)?.abort();
+      return;
+    }
+    // Handle requests from the content script
     if (event.data && event.data.type === "__fetchAboutAccountQuery") {
       const { screenName, requestId } = event.data;
 
@@ -104,6 +110,9 @@
         return;
       }
 
+      const controller = new AbortController();
+      activeRequests.set(requestId, controller);
+
       // Wait for headers to be ready
       if (!headersReady) {
         let waitCount = 0;
@@ -113,9 +122,9 @@
         }
       }
 
-      const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 10000);
       try {
+        controller.signal.throwIfAborted();
         const variables = JSON.stringify({ screenName });
         const url = `https://x.com/i/api/graphql/XRqGa7EeokUU5kppkh13EA/AboutAccountQuery?variables=${encodeURIComponent(
           variables
@@ -222,6 +231,7 @@
           "*"
         );
       } finally {
+        activeRequests.delete(requestId);
         clearTimeout(timeout);
       }
     }

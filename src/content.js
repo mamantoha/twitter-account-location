@@ -30,6 +30,11 @@ const PERSISTED_QUEUE_KEY = "pending_usernames_queue";
 let persistedQueuedUsernames = new Set();
 let persistedQueueSaveTimer = null;
 let queueClearEpoch = 0;
+let renderEpoch = 0;
+let cancelActiveRequest = null;
+const clearedContainers = new WeakSet();
+let pageScriptReady = false;
+let wakeRequestQueue = null;
 
 // Store latest rate limit info
 let latestRateLimitInfo = {
@@ -52,12 +57,37 @@ let extensionEnabled = true;
 const TOGGLE_KEY = "extension_enabled";
 const DEFAULT_ENABLED = true;
 
+function updateEnabledState(enabled) {
+  const changed = extensionEnabled !== enabled;
+  extensionEnabled = enabled;
+  if (!enabled) {
+    if (changed) renderEpoch += 1;
+    for (const callbacks of requestQueue.values()) {
+      callbacks.forEach(({ resolve }) => resolve(null));
+      callbacks.length = 0;
+    }
+    if (cancelActiveRequest) cancelActiveRequest(true);
+    if (wakeRequestQueue) wakeRequestQueue();
+    removeAllLocations();
+  } else if (changed && pageScriptReady) {
+    processRequestQueue();
+    processUsernames();
+  }
+}
+
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes[TOGGLE_KEY]) {
+    updateEnabledState(changes[TOGGLE_KEY].newValue ?? DEFAULT_ENABLED);
+  }
+});
+
 // Load enabled state
 async function loadEnabledState() {
   try {
     const result = await browser.storage.local.get([TOGGLE_KEY]);
-    extensionEnabled =
-      result[TOGGLE_KEY] !== undefined ? result[TOGGLE_KEY] : DEFAULT_ENABLED;
+    updateEnabledState(
+      result[TOGGLE_KEY] !== undefined ? result[TOGGLE_KEY] : DEFAULT_ENABLED
+    );
   } catch (error) {
     console.error("Error loading enabled state:", error);
     extensionEnabled = DEFAULT_ENABLED;
@@ -95,8 +125,21 @@ function removeFromPersistedQueue(screenName) {
 
 async function clearPersistedQueue() {
   queueClearEpoch += 1;
+  renderEpoch += 1;
+  document.querySelectorAll('article[data-testid="tweet"], [data-testid="UserCell"], [data-testid="User-Names"], [data-testid="User-Name"]').forEach((container) => {
+    clearedContainers.add(container);
+  });
   persistedQueuedUsernames.clear();
+  for (const callbacks of requestQueue.values()) {
+    callbacks.forEach(({ resolve }) => resolve(null));
+  }
   requestQueue.clear();
+  if (cancelActiveRequest) cancelActiveRequest();
+  if (wakeRequestQueue) wakeRequestQueue();
+  document.querySelectorAll("[data-twitter-location-spinner]").forEach((spinner) => spinner.remove());
+  document.querySelectorAll("[data-location-waiting]").forEach((container) => {
+    delete container.dataset.locationWaiting;
+  });
 
   if (persistedQueueSaveTimer) {
     clearTimeout(persistedQueueSaveTimer);
@@ -111,8 +154,10 @@ async function clearPersistedQueue() {
 }
 
 async function restorePersistedQueue() {
+  const restoreEpoch = queueClearEpoch;
   try {
     const result = await browser.storage.local.get([PERSISTED_QUEUE_KEY]);
+    if (restoreEpoch !== queueClearEpoch) return;
     const list = Array.isArray(result[PERSISTED_QUEUE_KEY])
       ? result[PERSISTED_QUEUE_KEY]
       : [];
@@ -125,6 +170,7 @@ async function restorePersistedQueue() {
     if (typeof cacheManager !== "undefined") {
       for (const screenName of Array.from(persistedQueuedUsernames)) {
         const cached = await cacheManager.getValue(screenName);
+        if (restoreEpoch !== queueClearEpoch) return;
         if (cached !== undefined) {
           // If a record exists (even null), don't keep it pending forever
           persistedQueuedUsernames.delete(screenName);
@@ -185,14 +231,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     })();
     return true;
   } else if (request.type === "extensionToggle") {
-    extensionEnabled = request.enabled;
-    if (extensionEnabled) {
-      setTimeout(() => {
-        processUsernames();
-      }, 500);
-    } else {
-      removeAllLocations();
-    }
+    updateEnabledState(request.enabled);
     return;
   } else if (request.type === "getCacheCount") {
     (async () => {
@@ -458,19 +497,33 @@ function initializeThemeCache() {
 }
 
 // Process request queue with rate limiting
+function waitForQueue(delay) {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      wakeRequestQueue = null;
+      resolve();
+    }, delay);
+    wakeRequestQueue = () => {
+      clearTimeout(timeout);
+      wakeRequestQueue = null;
+      resolve();
+    };
+  });
+}
+
 async function processRequestQueue() {
-  if (isProcessingQueue || requestQueue.size === 0) {
+  if (!pageScriptReady || !extensionEnabled || isProcessingQueue || requestQueue.size === 0) {
     return;
   }
 
   isProcessingQueue = true;
 
   try {
-    while (requestQueue.size > 0) {
+    while (extensionEnabled && requestQueue.size > 0) {
       // Re-check rate limit before starting each request.
       const waitTime = rateLimitResetTime * 1000 - Date.now();
       if (waitTime > 0) {
-        await new Promise((resolve) => setTimeout(resolve, Math.min(waitTime, 60000)));
+        await waitForQueue(Math.min(waitTime, 60000));
         continue;
       }
       rateLimitResetTime = 0;
@@ -478,6 +531,7 @@ async function processRequestQueue() {
       // Get the next screenName to process
       const screenName = requestQueue.keys().next().value;
       const callbacks = requestQueue.get(screenName);
+      const requestEpoch = queueClearEpoch;
 
       // Remove from queue
       requestQueue.delete(screenName);
@@ -489,7 +543,7 @@ async function processRequestQueue() {
         callbacks.forEach(({ reject }) => reject(error));
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      if (extensionEnabled && requestEpoch === queueClearEpoch) await waitForQueue(200);
     }
   } finally {
     isProcessingQueue = false;
@@ -502,6 +556,21 @@ function makeAboutAccountQueryRequest(screenName) {
     const requestId = Date.now() + Math.random();
     const requestEpoch = queueClearEpoch;
 
+    const cleanup = () => {
+      window.removeEventListener("message", handler);
+      clearTimeout(timeout);
+      if (cancelActiveRequest === cancel) cancelActiveRequest = null;
+    };
+    const cancel = (retain = false) => {
+      cleanup();
+      if (retain && !requestQueue.has(screenName)) {
+        requestQueue.set(screenName, []);
+      }
+      window.postMessage({ type: "__cancelAboutAccountQuery", requestId }, "*");
+      resolve(null);
+    };
+    cancelActiveRequest = cancel;
+
     // Listen for response via postMessage
     const handler = async (event) => {
       // Only accept messages from the page (not from extension)
@@ -513,8 +582,7 @@ function makeAboutAccountQueryRequest(screenName) {
         event.data.screenName === screenName &&
         event.data.requestId === requestId
       ) {
-        window.removeEventListener("message", handler);
-        clearTimeout(timeout);
+        cleanup();
         if (event.data.error) {
           reject(new Error(event.data.error));
           return;
@@ -550,7 +618,8 @@ function makeAboutAccountQueryRequest(screenName) {
 
     window.addEventListener("message", handler);
     const timeout = setTimeout(() => {
-      window.removeEventListener("message", handler);
+      cleanup();
+      window.postMessage({ type: "__cancelAboutAccountQuery", requestId }, "*");
       reject(new Error(`Account request timed out for ${screenName}`));
     }, 15000);
 
@@ -576,8 +645,12 @@ async function getAboutAccount(screenName) {
 
   // Create a new promise for this request
   promise = (async () => {
+    const requestEpoch = queueClearEpoch;
+    const requestRenderEpoch = renderEpoch;
     // Check cache first
     const data = await cacheManager.getValue(screenName);
+
+    if (requestEpoch !== queueClearEpoch || requestRenderEpoch !== renderEpoch || !extensionEnabled) return null;
 
     if (data !== undefined && data.account) {
       // Return the full cached account JSON response
@@ -820,6 +893,8 @@ function insertElementNearHandle(container, screenName, element) {
 
 // Function to add location to username element
 async function addLocationToUsername(usernameElement, screenName) {
+  if (!extensionEnabled || clearedContainers.has(usernameElement)) return;
+  const requestRenderEpoch = renderEpoch;
   // Check if location already added
   if (usernameElement.dataset.locationAdded === "true") {
     return;
@@ -855,6 +930,8 @@ async function addLocationToUsername(usernameElement, screenName) {
       spinnerSpan.remove();
     }
 
+    if (!extensionEnabled || requestRenderEpoch !== renderEpoch) return;
+
     if (!account) {
       // Not cached or not found, do not show anything
       return;
@@ -889,11 +966,12 @@ async function addLocationToUsername(usernameElement, screenName) {
     let hideTimeout = null;
     const showTooltip = () => {
       if (tooltip) return;
+      const tooltipRenderEpoch = renderEpoch;
       (async () => {
         document.querySelectorAll('.twitter-location-tooltip').forEach((el) => el.remove());
         const cached = await cacheManager.getValue(screenName);
         const account = cached?.account?.data?.user_result_by_screen_name?.result;
-        if (!account) return;
+        if (!account || !extensionEnabled || tooltipRenderEpoch !== renderEpoch) return;
 
         tooltip = document.createElement('div');
         tooltip.className = 'twitter-location-tooltip';
@@ -1071,6 +1149,7 @@ async function addLocationToUsername(usernameElement, screenName) {
 
 // Function to remove all locations (when extension is disabled)
 function removeAllLocations() {
+  document.querySelectorAll(".twitter-location-tooltip").forEach((tooltip) => tooltip.remove());
   document.querySelectorAll("[data-twitter-location]").forEach((loc) => loc.remove());
   document.querySelectorAll("[data-twitter-location-spinner]").forEach((spinner) => spinner.remove());
   document.querySelectorAll("[data-location-added]").forEach((container) => {
@@ -1094,6 +1173,7 @@ async function processUsernames() {
   );
 
   for (const container of containers) {
+    if (clearedContainers.has(container)) continue;
     const screenName = extractUsername(container);
     if (screenName) {
       // Process if not already added
@@ -1146,6 +1226,7 @@ function observeDynamicContent() {
   // Inject the page script for fetch access
   try {
     await injectPageScript();
+    pageScriptReady = true;
   } catch (error) {
     console.error("Unable to initialize account requests:", error);
     return;
