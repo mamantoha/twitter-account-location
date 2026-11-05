@@ -882,50 +882,86 @@ async function addLocationToUsername(usernameElement, screenName) {
         tooltip.style.userSelect = 'text';
         tooltip.style.border = `1px solid ${theme.borderColor}`;
 
-        let html = "<div style='font-weight:700;font-size:1.15em;margin-bottom:18px;'>About this account</div>";
-        html += `<div style='display:flex;align-items:center;margin-bottom:16px;'>`;
-        if (account.avatar?.image_url) {
-          html += `<img src='${account.avatar.image_url.replace("_normal", "_bigger")}' style='width:48px;height:48px;border-radius:50%;margin-right:14px;'>`;
-        }
-        html += `<div><div style='font-weight:600;font-size:1.1em;'>${account.core?.name || ""}</div>`;
-        html += `<div style='color:${theme.accentColor};'>@${account.core?.screen_name || ""}</div></div></div>`;
+        const title = document.createElement("div");
+        title.style.cssText = "font-weight:700;font-size:1.15em;margin-bottom:18px;";
+        title.textContent = "About this account";
+        tooltip.appendChild(title);
 
-        html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>📅</span><span>Joined ${account.core?.created_at ? new Date(account.core.created_at).toLocaleString('default', { month: 'long', year: 'numeric' }) : "Unknown"}</span></div>`;
+        const profile = document.createElement("div");
+        profile.style.cssText = "display:flex;align-items:center;margin-bottom:16px;";
+        if (typeof account.avatar?.image_url === "string") {
+          try {
+            const avatarUrl = new URL(account.avatar.image_url);
+            if (avatarUrl.protocol === "https:") {
+              const avatar = document.createElement("img");
+              avatar.src = avatarUrl.href.replace("_normal", "_bigger");
+              avatar.alt = "";
+              avatar.style.cssText = "width:48px;height:48px;border-radius:50%;margin-right:14px;";
+              profile.appendChild(avatar);
+            }
+          } catch (error) {
+            // Skip invalid avatar URLs.
+          }
+        }
+        const identity = document.createElement("div");
+        const name = document.createElement("div");
+        name.style.cssText = "font-weight:600;font-size:1.1em;";
+        name.textContent = account.core?.name || "";
+        const handle = document.createElement("div");
+        handle.style.color = theme.accentColor;
+        handle.textContent = `@${account.core?.screen_name || ""}`;
+        identity.appendChild(name);
+        identity.appendChild(handle);
+        profile.appendChild(identity);
+        tooltip.appendChild(profile);
+
+        const appendDetail = (icon, text) => {
+          const row = document.createElement("div");
+          row.style.cssText = "display:flex;align-items:center;margin-bottom:10px;gap:10px;";
+          const symbol = document.createElement("span");
+          symbol.style.fontSize = "1.2em";
+          symbol.textContent = icon;
+          const value = document.createElement("span");
+          value.textContent = text;
+          row.appendChild(symbol);
+          row.appendChild(value);
+          tooltip.appendChild(row);
+          return row;
+        };
+
+        appendDetail("📅", `Joined ${account.core?.created_at ? new Date(account.core.created_at).toLocaleString('default', { month: 'long', year: 'numeric' }) : "Unknown"}`);
 
         if (account.about_profile?.account_based_in) {
-          html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>📍</span><span>Account based in ${account.about_profile.account_based_in}</span>`;
+          const row = appendDetail("📍", `Account based in ${account.about_profile.account_based_in}`);
           if (account.about_profile?.location_accurate) {
-            html += `<span style='margin-left:6px;font-size:1.1em;' title='Location accurate'>🛡️</span>`;
+            const shield = document.createElement("span");
+            shield.style.cssText = "margin-left:6px;font-size:1.1em;";
+            shield.title = "Location accurate";
+            shield.textContent = "🛡️";
+            row.appendChild(shield);
           }
-          html += `</div>`;
         }
 
         if (account.verification_info?.reason?.verified_since_msec) {
           const since = new Date(Number(account.verification_info.reason.verified_since_msec));
-          html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>✅</span><span>Verified since ${since.toLocaleString('default', { month: 'long', year: 'numeric' })}</span></div>`;
+          appendDetail("✅", `Verified since ${since.toLocaleString('default', { month: 'long', year: 'numeric' })}`);
         } else if (account.verification?.verified || account.is_blue_verified) {
-          html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>✅</span><span>Verified</span></div>`;
+          appendDetail("✅", "Verified");
         }
 
         if (account.about_profile?.source) {
-          html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>🌐</span><span>Connected via ${account.about_profile.source}</span></div>`;
+          appendDetail("🌐", `Connected via ${account.about_profile.source}`);
         }
 
         if (account.about_profile?.username_changes) {
-          html += `<div style='display:flex;align-items:center;margin-bottom:10px;gap:10px;'><span style='font-size:1.2em;'>🔄</span><span>Username changes: ${account.about_profile.username_changes.count}`;
+          let text = `Username changes: ${account.about_profile.username_changes.count}`;
           if (account.about_profile.username_changes.last_changed_at_msec) {
             const d = new Date(Number(account.about_profile.username_changes.last_changed_at_msec));
-            html += ` (last: ${d.toLocaleDateString()})`;
+            text += ` (last: ${d.toLocaleDateString()})`;
           }
-          html += `</span></div>`;
+          appendDetail("🔄", text);
         }
 
-
-        // Safer: use DOMParser to parse the HTML and append nodes
-        // This avoids direct assignment to innerHTML with dynamic content
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(`<div>${html}</div>`, 'text/html');
-        Array.from(doc.body.firstChild.childNodes).forEach(node => tooltip.appendChild(node));
         document.body.appendChild(tooltip);
 
         // Position tooltip near location span
