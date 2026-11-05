@@ -238,25 +238,11 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.type === "extensionToggle") {
     updateEnabledState(request.enabled);
     return;
-  } else if (request.type === "getCacheCount") {
-    (async () => {
-      try {
-        if (typeof cacheManager === "undefined") {
-          sendResponse({ count: 0 });
-          return;
-        }
-        const count = await cacheManager.getCacheCount();
-        sendResponse({ count });
-      } catch (e) {
-        sendResponse({ count: 0 });
-      }
-    })();
-    return true;
   } else if (request.type === "getAllCacheEntries") {
     (async () => {
       try {
         if (typeof cacheManager === "undefined" || !cacheManager.getAllEntries) {
-          sendResponse({ entries: [] });
+          sendResponse({ error: "Unable to load cache entries" });
           return;
         }
 
@@ -290,7 +276,7 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
         sendResponse({ entries });
       } catch (e) {
-        sendResponse({ entries: [] });
+        sendResponse({ error: "Unable to load cache entries" });
       }
     })();
     return true;

@@ -75,30 +75,6 @@ class CacheManager {
     }
   }
 
-  // Get total count of cached locations
-  async getCacheCount() {
-    try {
-      const db = await this.openDB();
-      const transaction = db.transaction([this.STORE_NAME], "readonly");
-      const store = transaction.objectStore(this.STORE_NAME);
-      const request = store.count();
-
-      return new Promise((resolve, reject) => {
-        request.onsuccess = () => {
-          db.close();
-          resolve(request.result);
-        };
-        request.onerror = () => {
-          db.close();
-          reject(request.error);
-        };
-      });
-    } catch (error) {
-      console.error("Error getting cache count:", error);
-      return 0;
-    }
-  }
-
   // Get all cached entries (filters expired entries and optionally prunes them)
   async getAllEntries({ pruneExpired = true } = {}) {
     try {
@@ -145,7 +121,7 @@ class CacheManager {
       });
     } catch (error) {
       console.error("Error getting all cache entries:", error);
-      return [];
+      throw error;
     }
   }
 

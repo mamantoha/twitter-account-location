@@ -29,7 +29,6 @@ let allCacheEntries = [];
     const isEnabled =
       result[TOGGLE_KEY] !== undefined ? result[TOGGLE_KEY] : DEFAULT_ENABLED;
     updateToggle(isEnabled);
-    await updateCacheCount();
     await updateRateLimitInfo();
     // Show extension version only
     const manifest = browser.runtime.getManifest();
@@ -109,9 +108,7 @@ function applyProfilesFilter() {
 }
 
 async function refreshCacheViews() {
-  await updateCacheCount();
   await renderCacheViews();
-  applyProfilesFilter();
 }
 
 async function deleteCacheEntry(username) {
@@ -171,7 +168,7 @@ async function loadAllCacheEntries() {
     });
 
     if (!tabs[0]?.id) {
-      return [];
+      return null;
     }
 
     const response = await browser.tabs.sendMessage(tabs[0].id, {
@@ -182,24 +179,34 @@ async function loadAllCacheEntries() {
       return response.entries;
     }
 
-    return [];
+    return null;
   } catch (e) {
     console.error("Error loading cache entries:", e);
-    return [];
+    return null;
   }
 }
 
 async function renderCacheViews() {
   if (!profilesListEl || !countryStatsEl) return;
 
+  cacheInfoEl.textContent = "Cached locations: Loading...";
   profilesListEl.textContent = "Loading...";
   countryStatsEl.textContent = "Loading...";
 
   const entries = await loadAllCacheEntries();
 
-  allCacheEntries = entries;
+  if (entries === null) {
+    allCacheEntries = [];
+    cacheInfoEl.textContent = "Cached locations: Unable to load";
+    profilesListEl.textContent = "Unable to load cached profiles.";
+    countryStatsEl.textContent = "Unable to load cache statistics.";
+    return;
+  }
 
-  renderProfiles(entries);
+  allCacheEntries = entries;
+  cacheInfoEl.textContent = `Cached locations: ${entries.length}`;
+
+  applyProfilesFilter();
   renderCountryStats(entries);
 }
 
@@ -414,29 +421,5 @@ function updateToggle(isEnabled) {
     toggleSwitchEl.classList.add("enabled");
   } else {
     toggleSwitchEl.classList.remove("enabled");
-  }
-}
-
-async function updateCacheCount() {
-  try {
-    const tabs = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
-    if (tabs[0]) {
-      const response = await browser.tabs.sendMessage(tabs[0].id, {
-        type: "getCacheCount",
-      });
-      if (response && typeof response.count === "number") {
-        cacheInfoEl.textContent = `Cached locations: ${response.count}`;
-      } else {
-        cacheInfoEl.textContent = "Cached locations: Unable to load";
-      }
-    } else {
-      cacheInfoEl.textContent = "Cached locations: No active tab";
-    }
-  } catch (e) {
-    console.error("Error getting cache count:", e);
-    cacheInfoEl.textContent = "Cached locations: Error";
   }
 }
