@@ -279,10 +279,28 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
 function injectPageScript() {
   const script = document.createElement("script");
   script.src = browser.runtime.getURL("src/pageScript.js");
-  script.onload = function () {
-    this.remove();
-  };
-  (document.head || document.documentElement).appendChild(script);
+  const ready = new Promise((resolve, reject) => {
+    const cleanup = () => {
+      clearTimeout(timeout);
+      window.removeEventListener("message", onReady);
+      script.onerror = null;
+      script.remove();
+    };
+    const onReady = (event) => {
+      if (event.source !== window || event.data?.type !== "__aboutAccountQueryReady") return;
+      cleanup();
+      resolve();
+    };
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error("Page script readiness timed out"));
+    }, 5000);
+    window.addEventListener("message", onReady);
+    script.onerror = () => {
+      cleanup();
+      reject(new Error("Page script failed to load"));
+    };
+  });
 
   // Listen for rate limit info from page script
   window.addEventListener("message", (event) => {
@@ -318,6 +336,8 @@ function injectPageScript() {
       }
     }
   });
+  (document.head || document.documentElement).appendChild(script);
+  return ready;
 }
 
 // Compute tooltip theme styles from current Twitter/X theme
@@ -494,6 +514,11 @@ function makeAboutAccountQueryRequest(screenName) {
         event.data.requestId === requestId
       ) {
         window.removeEventListener("message", handler);
+        clearTimeout(timeout);
+        if (event.data.error) {
+          reject(new Error(event.data.error));
+          return;
+        }
         const account = event.data.account;
         const isRateLimited = event.data.isRateLimited || false;
 
@@ -524,6 +549,10 @@ function makeAboutAccountQueryRequest(screenName) {
     };
 
     window.addEventListener("message", handler);
+    const timeout = setTimeout(() => {
+      window.removeEventListener("message", handler);
+      reject(new Error(`Account request timed out for ${screenName}`));
+    }, 15000);
 
     // Send fetch request to page script via postMessage
     window.postMessage(
@@ -573,9 +602,10 @@ async function getAboutAccount(screenName) {
   inFlightRequests.set(screenName, promise);
 
   // Clean up when the promise resolves
-  promise.finally(() => {
+  const clearInFlight = () => {
     inFlightRequests.delete(screenName);
-  });
+  };
+  promise.then(clearInFlight, clearInFlight);
 
   return promise;
 }
@@ -1114,7 +1144,12 @@ function observeDynamicContent() {
   await loadEnabledState();
 
   // Inject the page script for fetch access
-  injectPageScript();
+  try {
+    await injectPageScript();
+  } catch (error) {
+    console.error("Unable to initialize account requests:", error);
+    return;
+  }
 
   // Initialize theme cache for tooltip performance
   initializeThemeCache();

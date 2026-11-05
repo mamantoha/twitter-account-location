@@ -113,6 +113,8 @@
         }
       }
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
       try {
         const variables = JSON.stringify({ screenName });
         const url = `https://x.com/i/api/graphql/XRqGa7EeokUU5kppkh13EA/AboutAccountQuery?variables=${encodeURIComponent(
@@ -127,6 +129,7 @@
 
         // Ensure credentials are included
         const response = await fetch(url, {
+          signal: controller.signal,
           method: "GET",
           credentials: "include",
           headers: headers,
@@ -214,10 +217,14 @@
             account: null,
             requestId,
             isRateLimited: false,
+            error: error.name === "AbortError" ? "Account fetch timed out" : "Account fetch failed",
           },
           "*"
         );
+      } finally {
+        clearTimeout(timeout);
       }
     }
   });
+  window.postMessage({ type: "__aboutAccountQueryReady" }, "*");
 })();
