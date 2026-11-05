@@ -125,17 +125,19 @@ async function deleteCacheEntry(username) {
     });
 
     if (!tabs[0]?.id) {
-      return;
+      throw new Error("No active tab available for cache deletion");
     }
 
-    await browser.tabs.sendMessage(tabs[0].id, {
+    const response = await browser.tabs.sendMessage(tabs[0].id, {
       type: "deleteCacheEntry",
       username: cleaned,
     });
+    if (!response?.deleted) throw new Error("Cache deletion failed");
 
     await refreshCacheViews();
   } catch (e) {
     console.error("Error deleting cache entry:", e);
+    cacheInfoEl.textContent = "Unable to delete cached profile. Try again.";
   }
 }
 
@@ -262,7 +264,11 @@ function renderProfiles(entries, { isFiltered = false } = {}) {
         event.preventDefault();
         event.stopPropagation();
         deleteBtn.disabled = true;
-        await deleteCacheEntry(username);
+        try {
+          await deleteCacheEntry(username);
+        } finally {
+          deleteBtn.disabled = false;
+        }
       });
 
       row.appendChild(deleteBtn);

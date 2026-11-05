@@ -616,9 +616,13 @@ function makeAboutAccountQueryRequest(screenName) {
             reject(new Error(`Invalid account response for ${screenName}`));
             return;
           }
-          await cacheManager.saveCacheEntry(screenName, account);
-          // Only validated results complete persisted work.
-          removeFromPersistedQueue(screenName);
+          try {
+            await cacheManager.saveCacheEntry(screenName, account);
+            // Keep work pending if the result could not be persisted.
+            removeFromPersistedQueue(screenName);
+          } catch (error) {
+            console.error("Error saving account result:", error);
+          }
           resolve(status === "missing" ? null : account);
           return;
         }

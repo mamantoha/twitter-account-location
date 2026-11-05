@@ -53,35 +53,25 @@ class CacheManager {
 
   // Get a single cached value from IndexedDB
   async getValue(username) {
+    let db;
     try {
-      const db = await this.openDB();
+      db = await this.openDB();
       const transaction = db.transaction([this.STORE_NAME], "readonly");
       const store = transaction.objectStore(this.STORE_NAME);
       const request = store.get(username);
-
-      return new Promise((resolve, reject) => {
-        request.onsuccess = async (event) => {
-          const data = event.target.result;
-          if (this.isValidEntry(data)) {
-            db.close();
-            resolve(data);
-          } else {
-            // Expired or no data, delete if exists
-            if (data) {
-              await this.deleteEntry(username);
-            }
-            db.close();
-            resolve(undefined);
-          }
-        };
-        request.onerror = () => {
-          db.close();
-          reject(request.error);
-        };
+      const data = await new Promise((resolve, reject) => {
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+        transaction.onabort = () => reject(transaction.error || new Error("Cache read aborted"));
       });
+      if (this.isValidEntry(data)) return data;
+      if (data) await this.deleteEntry(username);
+      return undefined;
     } catch (error) {
       console.error("Error getting cached value:", error);
       return undefined;
+    } finally {
+      if (db) db.close();
     }
   }
 
@@ -159,49 +149,37 @@ class CacheManager {
     }
   }
 
+  // A successful request can still be rolled back before the transaction commits.
+  async runWriteTransaction(write) {
+    const db = await this.openDB();
+    try {
+      await new Promise((resolve, reject) => {
+        const transaction = db.transaction([this.STORE_NAME], "readwrite");
+        transaction.oncomplete = () => resolve();
+        transaction.onerror = () => reject(transaction.error || new Error("Cache write failed"));
+        transaction.onabort = () => reject(transaction.error || new Error("Cache write aborted"));
+        write(transaction.objectStore(this.STORE_NAME));
+      });
+    } finally {
+      db.close();
+    }
+  }
+
   // Save a cache entry to IndexedDB
   async saveCacheEntry(username, account) {
     if (!browser.runtime?.id || !this.getAccountStatus(account)) {
       return;
     }
-
-    // Save to IndexedDB immediately
-    try {
-      const db = await this.openDB();
-      const transaction = db.transaction([this.STORE_NAME], "readwrite");
-      const store = transaction.objectStore(this.STORE_NAME);
-
-      const now = Date.now();
-      const data = {
-        account: account,
-        cachedAt: now,
-      };
-      const request = store.put(data, username);
-      await new Promise((resolve, reject) => {
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-      db.close();
-    } catch (error) {
-      console.error("Error saving cache entry:", error);
-    }
+    await this.runWriteTransaction((store) => {
+      store.put({ account: account, cachedAt: Date.now() }, username);
+    });
   }
 
-  // Delete an expired cache entry from IndexedDB
+  // Delete a cache entry from IndexedDB
   async deleteEntry(username) {
-    try {
-      const db = await this.openDB();
-      const transaction = db.transaction([this.STORE_NAME], "readwrite");
-      const store = transaction.objectStore(this.STORE_NAME);
-      const request = store.delete(username);
-      await new Promise((resolve, reject) => {
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
-      db.close();
-    } catch (error) {
-      console.error("Error deleting expired cache entry:", error);
-    }
+    await this.runWriteTransaction((store) => {
+      store.delete(username);
+    });
   }
 
   // Load cache from persistent storage (no-op since we don't need to preload anything now)
