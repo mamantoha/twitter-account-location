@@ -214,6 +214,7 @@
             account: null,
             requestId,
             isRateLimited: response.status === 429,
+            error: response.status === 429 ? null : `Account request failed (HTTP ${response.status})`,
           },
           "*"
         );

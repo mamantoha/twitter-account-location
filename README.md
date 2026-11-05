@@ -68,6 +68,7 @@ A browser extension that displays account-based location information next to Twi
 - **Content Script Communication:** The content script listens for location fetch requests. When a username is detected, it sends a custom event to the page script, which makes the API request and returns the location data.
 
 - **Caching:** Location data is cached in your browser's IndexedDB and expires automatically after 30 days to minimize API calls and improve performance.
+  Confirmed missing accounts are cached for one day. HTTP errors, GraphQL errors, and malformed responses are not cached.
 
 ## API Endpoint
 

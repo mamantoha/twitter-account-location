@@ -10,6 +10,30 @@ class CacheManager {
     this.DB_VERSION = 1;
     this.STORE_NAME = "locations";
     this.CACHE_EXPIRY_DAYS = 30;
+    this.MISSING_EXPIRY_DAYS = 1;
+  }
+
+  getAccountStatus(account) {
+    if (!account || (account.errors && (!Array.isArray(account.errors) || account.errors.length > 0))) {
+      return null;
+    }
+    const user = account.data?.user_result_by_screen_name;
+    if (!user || !Object.prototype.hasOwnProperty.call(user, "result")) return null;
+    if (user.result === null) return "missing";
+    const result = user.result;
+    if (result && typeof result === "object" &&
+        (typeof result.core?.screen_name === "string" ||
+         (result.about_profile && typeof result.about_profile === "object"))) {
+      return "found";
+    }
+    return null;
+  }
+
+  isValidEntry(entry, now = Date.now()) {
+    const status = this.getAccountStatus(entry?.account);
+    if (!status || !Number.isFinite(entry.cachedAt)) return false;
+    const days = status === "missing" ? this.MISSING_EXPIRY_DAYS : this.CACHE_EXPIRY_DAYS;
+    return entry.cachedAt + days * 24 * 60 * 60 * 1000 > now;
   }
 
   // Open IndexedDB database
@@ -38,9 +62,7 @@ class CacheManager {
       return new Promise((resolve, reject) => {
         request.onsuccess = async (event) => {
           const data = event.target.result;
-          const now = Date.now();
-          const expiryMs = this.CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
-          if (data && data.cachedAt + expiryMs > now) {
+          if (this.isValidEntry(data)) {
             db.close();
             resolve(data);
           } else {
@@ -99,7 +121,6 @@ class CacheManager {
         const results = [];
         const expiredKeys = [];
         const now = Date.now();
-        const expiryMs = this.CACHE_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 
         request.onsuccess = (event) => {
           const cursor = event.target.result;
@@ -118,7 +139,7 @@ class CacheManager {
           const username = cursor.key;
           const value = cursor.value;
 
-          if (value && typeof value.cachedAt === "number" && value.cachedAt + expiryMs > now) {
+          if (this.isValidEntry(value, now)) {
             results.push({ username, account: value.account, cachedAt: value.cachedAt });
           } else {
             expiredKeys.push(username);
@@ -140,7 +161,7 @@ class CacheManager {
 
   // Save a cache entry to IndexedDB
   async saveCacheEntry(username, account) {
-    if (!browser.runtime?.id) {
+    if (!browser.runtime?.id || !this.getAccountStatus(account)) {
       return;
     }
 

@@ -172,7 +172,7 @@ async function restorePersistedQueue() {
         const cached = await cacheManager.getValue(screenName);
         if (restoreEpoch !== queueClearEpoch) return;
         if (cached !== undefined) {
-          // If a record exists (even null), don't keep it pending forever
+          // Valid account and confirmed-missing records both complete pending work.
           persistedQueuedUsernames.delete(screenName);
         }
       }
@@ -606,13 +606,19 @@ function makeAboutAccountQueryRequest(screenName) {
             processRequestQueue();
           }
         } else {
-          // Only cache if not rate limited (don't cache failures due to rate limiting)
-          await cacheManager.saveCacheEntry(screenName, account || null);
-          // Request completed (success or non-rate-limited failure) so remove from persisted queue
+          const status = cacheManager.getAccountStatus(account);
+          if (!status) {
+            reject(new Error(`Invalid account response for ${screenName}`));
+            return;
+          }
+          await cacheManager.saveCacheEntry(screenName, account);
+          // Only validated results complete persisted work.
           removeFromPersistedQueue(screenName);
+          resolve(status === "missing" ? null : account);
+          return;
         }
 
-        resolve(account);
+        resolve(undefined);
       }
     };
 
@@ -652,9 +658,8 @@ async function getAboutAccount(screenName) {
 
     if (requestEpoch !== queueClearEpoch || requestRenderEpoch !== renderEpoch || !extensionEnabled) return null;
 
-    if (data !== undefined && data.account) {
-      // Return the full cached account JSON response
-      return data.account;
+    if (data !== undefined) {
+      return cacheManager.getAccountStatus(data.account) === "missing" ? null : data.account;
     }
 
     // Not cached, queue the API request
@@ -933,7 +938,8 @@ async function addLocationToUsername(usernameElement, screenName) {
     if (!extensionEnabled || requestRenderEpoch !== renderEpoch) return;
 
     if (!account) {
-      // Not cached or not found, do not show anything
+      // Confirmed absence is complete; rate-limited requests remain retryable.
+      if (account === null) usernameElement.dataset.locationAdded = "true";
       return;
     }
 
