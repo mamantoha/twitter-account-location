@@ -166,7 +166,9 @@ async function restorePersistedQueue() {
       : [];
 
     persistedQueuedUsernames = new Set(
-      list.filter((v) => typeof v === "string" && v.trim().length > 0)
+      list
+        .filter((v) => typeof v === "string" && usernameFromHref(`/${v}`))
+        .map((v) => v.toLowerCase())
     );
 
     // Drop items that are already cached
@@ -646,6 +648,7 @@ function makeAboutAccountQueryRequest(screenName) {
 
 // Function to query Twitter GraphQL API for user account info (with rate limiting)
 async function getAboutAccount(screenName) {
+  screenName = screenName.toLowerCase();
   // Check if there's already a request in progress for this username
   let promise = inFlightRequests.get(screenName);
   if (promise) {
@@ -691,147 +694,47 @@ async function getAboutAccount(screenName) {
   return promise;
 }
 
+// Parse profile links without confusing route prefixes or tweet paths with handles.
+function usernameFromHref(href) {
+  if (typeof href !== "string") return null;
+  const match = href.match(/^\/([a-zA-Z0-9_]{1,15})\/?(?:[?#].*)?$/);
+  if (!match || EXCLUDED_ROUTES.includes(match[1].toLowerCase())) return null;
+  return match[1];
+}
+
 // Function to extract username from various Twitter UI elements
 function extractUsername(element) {
-  // Try data-testid="UserName" or "User-Name" first (most reliable)
-  let usernameElement = element.querySelector(
-    '[data-testid="UserName"], [data-testid="User-Name"]'
-  );
-
-  // check if element contains [data-testid="UserCell"]
-  if (element.getAttribute("data-testid") === "UserCell") {
-    usernameElement = element;
-  }
+  const nameSelector = '[data-testid="UserName"], [data-testid="User-Name"]';
+  const usernameElement = element.matches(`${nameSelector}, [data-testid="UserCell"]`)
+    ? element
+    : element.querySelector(nameSelector);
 
   if (usernameElement) {
-    const links = usernameElement.querySelectorAll('a[href^="/"]');
-
-    for (const link of links) {
-      const href = link.getAttribute("href");
-      const match = href.match(/^\/([^/?]+)/);
-      if (match && match[1]) {
-        const username = match[1];
-
-        // Filter out common routes
-        if (
-          !EXCLUDED_ROUTES.includes(username) &&
-          !username.startsWith("hashtag") &&
-          !username.startsWith("search") &&
-          username.length > 0 &&
-          username.length <= 15
-        ) {
-          return username;
-        }
-      }
+    for (const link of usernameElement.querySelectorAll('a[href^="/"]')) {
+      const username = usernameFromHref(link.getAttribute("href"));
+      if (username) return username;
     }
   }
 
-  // Try finding username links in the entire element (broader search)
-  const allLinks = element.querySelectorAll('a[href^="/"]');
-  const seenUsernames = new Set();
-
-  for (const link of allLinks) {
-    const href = link.getAttribute("href");
-    if (!href) continue;
-
-    const match = href.match(/^\/([^/?]+)/);
-    if (!match || !match[1]) continue;
-
-    const potentialUsername = match[1];
-
-    // Skip if we've already checked this username
-    if (seenUsernames.has(potentialUsername)) continue;
-    seenUsernames.add(potentialUsername);
-
-    // Filter out routes and invalid usernames
-    if (
-      EXCLUDED_ROUTES.some(
-        (route) =>
-          potentialUsername === route || potentialUsername.startsWith(route)
-      )
-    ) {
-      continue;
-    }
-
-    // Skip status/tweet links
-    if (
-      potentialUsername.includes("status") ||
-      potentialUsername.match(/^\d+$/)
-    ) {
-      continue;
-    }
-
-    // Check link text/content for username indicators
-    const text = link.textContent?.trim() || "";
-    const linkText = text.toLowerCase();
-    const usernameLower = potentialUsername.toLowerCase();
-
-    // If link text starts with @, it's definitely a username
-    if (text.startsWith("@")) {
-      return potentialUsername;
-    }
-
-    // If link text matches the username (without @), it's likely a username
-    if (linkText === usernameLower || linkText === `@${usernameLower}`) {
-      return potentialUsername;
-    }
-
-    // Check if link is in a UserName container or has username-like structure
-    const parent = link.closest(
-      '[data-testid="UserName"], [data-testid="User-Name"]'
-    );
-    if (parent) {
-      // If it's in a UserName container and looks like a username, return it
-      if (
-        potentialUsername.length > 0 &&
-        potentialUsername.length <= 15 &&
-        !potentialUsername.includes("/")
-      ) {
-        return potentialUsername;
-      }
-    }
-
-    // Also check if link text is @username format
-    if (text && text.trim().startsWith("@")) {
-      const atUsername = text.trim().substring(1);
-      if (atUsername === potentialUsername) {
-        return potentialUsername;
-      }
-    }
+  for (const link of element.querySelectorAll('a[href^="/"]')) {
+    const username = usernameFromHref(link.getAttribute("href"));
+    if (!username) continue;
+    const text = link.textContent?.trim().toLowerCase() || "";
+    const normalized = username.toLowerCase();
+    if (text === normalized || text === `@${normalized}`) return username;
   }
-
-  // Last resort: look for @username pattern in text content and verify with link
-  const textContent = element.textContent || "";
-  const atMentionMatches = textContent.matchAll(/@([a-zA-Z0-9_]+)/g);
-  for (const match of atMentionMatches) {
-    const username = match[1];
-    // Verify it's actually a link in a User-Name container
-    const link = element.querySelector(
-      `a[href="/${username}"], a[href^="/${username}?"]`
-    );
-    if (link) {
-      // Make sure it's in a username context, not just mentioned in tweet text
-      const isInUserNameContainer = link.closest(
-        '[data-testid="UserName"], [data-testid="User-Name"]'
-      );
-      if (isInUserNameContainer) {
-        return username;
-      }
-    }
-  }
-
   return null;
 }
 
 // Helper function to find handle section
 function findHandleSection(container, screenName) {
+  const normalized = screenName.toLowerCase();
   return Array.from(container.querySelectorAll("div")).find((div) => {
-    const link = div.querySelector(`a[href="/${screenName}"]`);
-    if (link) {
-      const text = link.textContent?.trim();
-      return text === `@${screenName}`;
-    }
-    return false;
+    return Array.from(div.querySelectorAll('a[href^="/"]')).some((link) => {
+      const username = usernameFromHref(link.getAttribute("href"));
+      return username?.toLowerCase() === normalized &&
+        link.textContent?.trim().toLowerCase() === `@${normalized}`;
+    });
   });
 }
 
@@ -910,7 +813,7 @@ async function addLocationToUsername(usernameElement, screenName) {
 
   // If there's already an in-flight request for this username, mark this container
   // as waiting and return — the successful request will update waiting containers.
-  if (inFlightRequests.has(screenName)) {
+  if (inFlightRequests.has(screenName.toLowerCase())) {
     usernameElement.dataset.locationWaiting = "true";
     return;
   }
@@ -978,7 +881,7 @@ async function addLocationToUsername(usernameElement, screenName) {
       const tooltipRenderEpoch = renderEpoch;
       (async () => {
         document.querySelectorAll('.twitter-location-tooltip').forEach((el) => el.remove());
-        const cached = await cacheManager.getValue(screenName);
+        const cached = await cacheManager.getValue(screenName.toLowerCase());
         const account = cached?.account?.data?.user_result_by_screen_name?.result;
         if (!account || !extensionEnabled || tooltipRenderEpoch !== renderEpoch) return;
 
@@ -1130,7 +1033,7 @@ async function addLocationToUsername(usernameElement, screenName) {
       // Also mark any other containers waiting for this username
       document.querySelectorAll(`[data-location-waiting="true"]`).forEach((container) => {
         const waitingUsername = extractUsername(container);
-        if (waitingUsername === screenName) {
+        if (waitingUsername?.toLowerCase() === screenName.toLowerCase()) {
           // Clear waiting flag and add location to this container too
           delete container.dataset.locationWaiting;
           addLocationToUsername(container, screenName).catch(() => {});
