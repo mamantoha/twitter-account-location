@@ -2,7 +2,7 @@ EXT_NAME=twitter_account_location
 EXT_VERSION=$(shell node -p "require('./package.json').version")
 DIST_DIR=dist/build
 
-EXT_FILES=src/background.js src/cacheManager.js src/content.js src/pageScript.js src/popup.html src/popup.js README.md LICENSE assets/*
+EXT_FILES=src/requestCoordinator.js src/background.js src/cacheManager.js src/content.js src/pageScript.js src/popup.html src/popup.js README.md LICENSE assets/*
 
 all: firefox chrome
 

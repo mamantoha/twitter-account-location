@@ -21,6 +21,9 @@
       const normalized = new Headers(headers);
       if (!normalized.get("authorization") || !normalized.get("x-csrf-token")) return;
       twitterHeaders = Object.fromEntries(normalized.entries());
+      if (!headersReady) {
+        window.postMessage({ type: "__aboutAccountHeadersReady" }, window.location.origin);
+      }
       headersReady = true;
     } catch (error) {
       // Header inspection must not prevent the page's original request.

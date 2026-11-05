@@ -80,9 +80,9 @@ Each source checkout has one local `manifest.json`. To load both browser variant
 
 - **Caching:** Valid account responses are reused from browser IndexedDB for 30 days; confirmed missing accounts are reused for one day. Expired or invalid entries are removed on lookup or when the popup loads its cache list. HTTP errors, GraphQL errors, and malformed responses are not cached.
 
-- **Request Queue:** Each tab runs one account request at a time, with a 200 ms pause between requests. Rate-limit headers control backoff; a rate-limited response without a usable future reset time triggers a two-minute fallback. Pending usernames are saved in extension local storage for restoration after a page reload.
+- **Request Queue:** The background coordinator owns one queue across X tabs, with one account request at a time and a 200 ms pause between requests. It delegates each request to a ready X tab, checks that tab's cache first, and broadcasts results to the tabs. Response headers control shared backoff; a rate-limited response without a usable future reset time triggers a two-minute fallback. Pending usernames, scheduling state, and rate-limit metadata are saved in extension local storage. The `alarms` permission lets the coordinator resume after background suspension. A persisted execution lease prevents immediate redispatch when the background restarts during a request.
 
-- **Popup Controls:** Disabling cancels the active request, pauses pending work, and removes location labels. Re-enabling resumes pending work. Clearing the queue discards pending work in the current tab and skips its currently displayed account containers until reload or replacement; existing location labels remain.
+- **Popup Controls:** Disabling cancels the active request, pauses pending work, and removes location labels. Re-enabling resumes pending work. Clearing the queue discards shared pending work across X tabs and skips their currently displayed account containers until reload or replacement; existing location labels remain.
 
 ## API Endpoint
 
@@ -113,12 +113,12 @@ data.user_result_by_screen_name.result.about_profile.account_based_in
 - Location names are shown as returned by the API.
 - The endpoint and response structure are hard-coded and may need updates when X changes its API.
 - The popup shows the latest observed rate-limit headers; the extension does not assume a fixed request allowance.
-- Request scheduling and backoff are per tab. Multiple X tabs do not coordinate their queues or API allowance.
+- Queued work needs a ready, logged-in X tab to execute requests. Closing the executing tab can delay failover until its execution lease expires.
 
 ## Privacy
 
 - Account queries go directly to `x.com` using the logged-in session.
-- Account responses are cached in browser IndexedDB. The enabled setting and pending usernames are stored in extension local storage.
+- Account responses are cached in browser IndexedDB. The enabled setting, pending usernames, and request scheduling/rate-limit metadata are stored in extension local storage.
 - Profile images are loaded from avatar URLs returned in account responses.
 - The extension has no analytics or separate backend.
 
@@ -165,12 +165,12 @@ If you loaded an extracted ZIP, rebuild and extract the updated files before rel
 There is no automated test suite. Run `npm run lint` and check the affected behavior in Firefox and Chrome:
 
 1. **Initial load and scrolling:** Visit X while logged in, then scroll to load more tweets or user cells. Locations should appear without duplicate labels or indefinitely waiting spinners. Hover a location to check its account tooltip.
-2. **Requests and cache:** In the page's Network panel, filter for `AboutAccountQuery`. Uncached accounts should be requested one at a time. Reload the page and confirm previously cached accounts do not trigger new account queries.
+2. **Requests and cache:** Open two X tabs and filter their Network panels for `AboutAccountQuery`. Requests should run one at a time across both tabs, and requesting the same uncached account should share one API result. Reload a page and confirm previously cached accounts do not trigger new account queries. Close the executing tab while another is ready and confirm pending work continues after failover.
 3. **Popup:** Confirm the count matches the loaded cache, search by username and location, and check statistics. With more than 100 entries, navigate profile pages and verify search includes accounts on other pages. Delete a profile and confirm the list and count update.
 4. **Keyboard:** Use Tab to reach the switch, search, tabs, and buttons. Toggle with Space or Enter; move between the Profiles and Stats tabs with Left/Right, Home, and End. Check visible focus indicators and action feedback.
 5. **Disable and resume:** Disable while requests are pending. Labels and spinners should disappear and new queued requests should stop. Re-enable and confirm pending work resumes. Check that another open X tab also observes the enabled setting.
-6. **Clear queue:** Clear pending work from the popup. Confirm success feedback, no stuck spinners, and no immediate refilling from the same visible account containers. Existing completed labels should remain.
-7. **Failures and rate limits:** When encountered, confirm network/authentication failures do not become cached results or permanently waiting spinners. For a rate-limited response, verify no new account requests start before reset.
+6. **Clear queue:** Clear pending work from the popup. Confirm both X tabs show an empty shared queue with no stuck spinners or immediate refilling from the same visible account containers. Existing completed labels should remain.
+7. **Failures and rate limits:** When encountered, confirm network/authentication failures do not become cached results or permanently waiting spinners. For a rate-limited response, verify neither tab starts new account requests before reset. Check that the pending queue and reset time survive background suspension and that work resumes afterward.
 8. **Packaging changes:** Run `make -j all`, extract both archives, and confirm each contains its matching browser manifest and loads in that browser.
 
 ## Contributing

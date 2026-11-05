@@ -18,32 +18,18 @@ const EXCLUDED_ROUTES = [
   "hashtag",
 ];
 
-// Rate limiting
-const requestQueue = new Map(); // screenName => [{resolve, reject}]
-let isProcessingQueue = false;
-let rateLimitResetTime = 0; // Unix timestamp when rate limit resets
-// Track in-flight network requests to avoid duplicate GraphQL calls for the same username
+// Requests are coordinated in the background; these maps only track local callers.
 const inFlightRequests = new Map();
-
-// Persisted queue (survives page reloads)
-const PERSISTED_QUEUE_KEY = "pending_usernames_queue";
-let persistedQueuedUsernames = new Set();
-let persistedQueueSaveTimer = null;
+const accountWaiters = new Map();
 let queueClearEpoch = 0;
 let renderEpoch = 0;
 let cancelActiveRequest = null;
 let activeBridgeRequest = null;
+let activeCoordinatorToken = null;
 const clearedContainers = new WeakSet();
 let pageScriptReady = false;
-let wakeRequestQueue = null;
-
-// Store latest rate limit info
-let latestRateLimitInfo = {
-  limit: null,
-  remaining: null,
-  resetTime: null,
-  waitTime: null,
-};
+let pageAuthenticationReady = false;
+let latestRateLimitInfo = { limit: null, remaining: null, resetTime: null, waitTime: null };
 
 // Observer for dynamically loaded content
 let observer = null;
@@ -66,21 +52,22 @@ function updateEnabledState(enabled) {
   extensionEnabled = enabled;
   if (!enabled) {
     if (changed) renderEpoch += 1;
-    for (const callbacks of requestQueue.values()) {
-      callbacks.forEach(({ resolve }) => resolve(null));
-      callbacks.length = 0;
-    }
-    if (cancelActiveRequest) cancelActiveRequest(true);
-    if (wakeRequestQueue) wakeRequestQueue();
+    for (const waiter of accountWaiters.values()) waiter.resolve(null);
+    accountWaiters.clear();
+    activeCoordinatorToken = null;
+    if (cancelActiveRequest) cancelActiveRequest();
     removeAllLocations();
   } else if (changed && pageScriptReady) {
-    processRequestQueue();
     processUsernames();
   }
 }
 
 browser.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && changes[TOGGLE_KEY]) {
+  if (area !== "local") return;
+  const shared = changes.account_request_state;
+  if (Number.isSafeInteger(shared?.newValue?.clearEpoch) &&
+      shared.newValue.clearEpoch > (shared.oldValue?.clearEpoch ?? 0)) clearLocalQueue();
+  if (changes[TOGGLE_KEY]) {
     updateEnabledState(changes[TOGGLE_KEY].newValue ?? DEFAULT_ENABLED);
   }
 });
@@ -98,103 +85,40 @@ async function loadEnabledState() {
   }
 }
 
-function schedulePersistedQueueSave() {
-  if (persistedQueueSaveTimer) {
-    clearTimeout(persistedQueueSaveTimer);
-  }
-
-  persistedQueueSaveTimer = setTimeout(async () => {
-    try {
-      await browser.storage.local.set({
-        [PERSISTED_QUEUE_KEY]: Array.from(persistedQueuedUsernames),
-      });
-    } catch (e) {
-      // Ignore persistence errors
-    }
-  }, 250);
-}
-
-function addToPersistedQueue(screenName) {
-  if (!screenName) return;
-  persistedQueuedUsernames.add(screenName);
-  schedulePersistedQueueSave();
-}
-
-function removeFromPersistedQueue(screenName) {
-  if (!screenName) return;
-  if (persistedQueuedUsernames.delete(screenName)) {
-    schedulePersistedQueueSave();
-  }
-}
-
-async function clearPersistedQueue() {
+function clearLocalQueue() {
   queueClearEpoch += 1;
   renderEpoch += 1;
-  document.querySelectorAll(USER_CONTAINER_SELECTOR).forEach((container) => {
-    clearedContainers.add(container);
-  });
-  persistedQueuedUsernames.clear();
-  for (const callbacks of requestQueue.values()) {
-    callbacks.forEach(({ resolve }) => resolve(null));
-  }
-  requestQueue.clear();
+  document.querySelectorAll(USER_CONTAINER_SELECTOR).forEach((container) => clearedContainers.add(container));
+  for (const waiter of accountWaiters.values()) waiter.resolve(null);
+  accountWaiters.clear();
+  activeCoordinatorToken = null;
   if (cancelActiveRequest) cancelActiveRequest();
-  if (wakeRequestQueue) wakeRequestQueue();
   document.querySelectorAll("[data-twitter-location-spinner]").forEach((spinner) => spinner.remove());
   document.querySelectorAll("[data-location-waiting]").forEach((container) => {
     delete container.dataset.locationWaiting;
   });
-
-  if (persistedQueueSaveTimer) {
-    clearTimeout(persistedQueueSaveTimer);
-    persistedQueueSaveTimer = null;
-  }
-
-  await browser.storage.local.set({ [PERSISTED_QUEUE_KEY]: [] });
 }
 
-async function restorePersistedQueue() {
-  const restoreEpoch = queueClearEpoch;
-  try {
-    const result = await browser.storage.local.get([PERSISTED_QUEUE_KEY]);
-    if (restoreEpoch !== queueClearEpoch) return;
-    const list = Array.isArray(result[PERSISTED_QUEUE_KEY])
-      ? result[PERSISTED_QUEUE_KEY]
-      : [];
-
-    persistedQueuedUsernames = new Set(
-      list
-        .filter((v) => typeof v === "string" && usernameFromHref(`/${v}`))
-        .map((v) => v.toLowerCase())
-    );
-
-    // Drop items that are already cached
-    if (typeof cacheManager !== "undefined") {
-      for (const screenName of Array.from(persistedQueuedUsernames)) {
-        const cached = await cacheManager.getValue(screenName);
-        if (restoreEpoch !== queueClearEpoch) return;
-        if (cached !== undefined) {
-          // Valid account and confirmed-missing records both complete pending work.
-          persistedQueuedUsernames.delete(screenName);
-        }
-      }
+async function receiveSharedAccountResult(request) {
+  const waiter = accountWaiters.get(request.screenName);
+  const epoch = queueClearEpoch;
+  if (request.error) {
+    if (waiter) {
+      accountWaiters.delete(request.screenName);
+      waiter.reject(new Error(request.error));
     }
-
-    // Seed in-memory queue so future requests attach callbacks instead of duplicating
-    for (const screenName of persistedQueuedUsernames) {
-      if (!requestQueue.has(screenName)) {
-        requestQueue.set(screenName, []);
-      }
-    }
-
-    schedulePersistedQueueSave();
-
-    if (persistedQueuedUsernames.size > 0) {
-      processRequestQueue();
-    }
-  } catch (e) {
-    // Ignore restore errors
+    return;
   }
+  const status = cacheManager.getAccountStatus(request.account);
+  if (!status) return;
+  try {
+    await cacheManager.saveCacheEntry(request.screenName, request.account, request.cachedAt);
+  } catch (error) {
+    console.error("Error saving shared account result:", error);
+  }
+  if (epoch !== queueClearEpoch || accountWaiters.get(request.screenName) !== waiter) return;
+  accountWaiters.delete(request.screenName);
+  if (waiter) waiter.resolve(status === "missing" ? null : request.account);
 }
 
 // Listen for toggle changes from popup
@@ -209,28 +133,50 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return;
   }
 
-  if (request.type === "getRateLimitInfo") {
-    let queuedRequests = 0;
-    for (const callbacks of requestQueue.values()) {
-      queuedRequests += Array.isArray(callbacks) ? callbacks.length : 0;
+  if (request.type === "executeSharedAccountQuery") {
+    if (!pageScriptReady || !pageAuthenticationReady || !extensionEnabled || activeBridgeRequest || activeCoordinatorToken ||
+        !Number.isFinite(request.deadline) || request.deadline <= Date.now() ||
+        request.deadline > Date.now() + 20000 ||
+        typeof request.token !== "string" || !usernameFromHref(`/${request.screenName}`)) {
+      sendResponse({ accepted: false });
+      return;
     }
-
-    sendResponse({
-      ...latestRateLimitInfo,
-      queueDistinct: requestQueue.size,
-      queueRequests: queuedRequests,
-      inFlight: inFlightRequests.size,
-    });
-    return true;
-  } else if (request.type === "clearPersistedQueue") {
+    activeCoordinatorToken = request.token;
+    latestRateLimitInfo = { limit: null, remaining: null, resetTime: null, waitTime: null };
+    sendResponse({ accepted: true });
     (async () => {
+      let result;
       try {
-        await clearPersistedQueue();
-        sendResponse({ cleared: true });
-      } catch (e) {
-        sendResponse({ cleared: false });
+        const cached = await cacheManager.getValue(request.screenName);
+        if (!extensionEnabled || activeCoordinatorToken !== request.token || Date.now() + 15000 > request.deadline) {
+          result = { cancelled: true };
+          if (activeCoordinatorToken === request.token) activeCoordinatorToken = null;
+        } else if (cached !== undefined) {
+          result = { account: cached.account, cachedAt: cached.cachedAt, isRateLimited: false };
+          activeCoordinatorToken = null;
+        } else {
+          result = await makeAboutAccountQueryRequest(request.screenName);
+        }
+      } catch (error) {
+        result = { account: null, isRateLimited: false, error: error.message, rateLimitInfo: latestRateLimitInfo };
+      }
+      try {
+        await browser.runtime.sendMessage({ type: "accountQueryComplete", token: request.token,
+          screenName: request.screenName, result });
+      } catch (error) {
+        console.error("Error reporting account request completion:", error);
       }
     })();
+    return;
+  } else if (request.type === "cancelSharedAccountQuery") {
+    if (request.token === activeCoordinatorToken) {
+      activeCoordinatorToken = null;
+      if (cancelActiveRequest) cancelActiveRequest();
+    }
+    sendResponse({ cancelled: activeCoordinatorToken === null });
+    return;
+  } else if (request.type === "sharedAccountQueryResult") {
+    receiveSharedAccountResult(request).then(() => sendResponse({ received: true }));
     return true;
   } else if (request.type === "getAllCacheEntries") {
     (async () => {
@@ -346,38 +292,23 @@ function injectPageScript() {
   // Listen for rate limit info from page script
   window.addEventListener("message", (event) => {
     if (!isPageMessage(event)) return;
+    if (event.data.type === "__aboutAccountHeadersReady") {
+      pageAuthenticationReady = true;
+      if (pageScriptReady) {
+        browser.runtime.sendMessage({ type: "resumeAccountQueue" }).catch((error) => {
+          console.error("Unable to resume authenticated account requests:", error);
+        });
+      }
+      return;
+    }
     if (event.data.type !== "__rateLimitInfo" && event.data.type !== "__rateLimitHeaders") return;
     if (!isValidRateLimitMessage(event.data)) return;
-    if (event.data.type === "__rateLimitInfo") {
-      // The page script may provide a resetTime (unix seconds)
-      const providedReset = event.data.resetTime;
-      // If reset time provided use it, otherwise fallback to 2 minutes
-      if (providedReset && Number.isFinite(providedReset)) {
-        rateLimitResetTime = providedReset;
-      } else {
-        rateLimitResetTime = Math.floor(Date.now() / 1000) + 120;
-      }
-      // Store extra info
-      latestRateLimitInfo.limit = event.data.limit;
-      latestRateLimitInfo.remaining = event.data.remaining;
-      latestRateLimitInfo.resetTime = event.data.resetTime;
-      latestRateLimitInfo.waitTime = event.data.waitTime;
-    }
-    // Optionally, listen for full rate limit info from page script
-    if (event.data && event.data.type === "__rateLimitHeaders") {
-      latestRateLimitInfo = {
-        limit: event.data.limit,
-        remaining: event.data.remaining,
-        resetTime: event.data.resetTime,
-        waitTime: event.data.waitTime,
-      };
-      if (event.data.remaining === 0) {
-        const resetTime = event.data.resetTime;
-        rateLimitResetTime = Number.isFinite(resetTime) && resetTime > Date.now() / 1000
-          ? resetTime
-          : Math.floor(Date.now() / 1000) + 120;
-      }
-    }
+    latestRateLimitInfo = {
+      limit: event.data.limit,
+      remaining: event.data.remaining,
+      resetTime: event.data.resetTime,
+      waitTime: event.data.waitTime,
+    };
   });
   (document.head || document.documentElement).appendChild(script);
   return ready;
@@ -500,65 +431,10 @@ function initializeThemeCache() {
   });
 }
 
-// Process request queue with rate limiting
-function waitForQueue(delay) {
-  return new Promise((resolve) => {
-    const timeout = setTimeout(() => {
-      wakeRequestQueue = null;
-      resolve();
-    }, delay);
-    wakeRequestQueue = () => {
-      clearTimeout(timeout);
-      wakeRequestQueue = null;
-      resolve();
-    };
-  });
-}
-
-async function processRequestQueue() {
-  if (!pageScriptReady || !extensionEnabled || isProcessingQueue || requestQueue.size === 0) {
-    return;
-  }
-
-  isProcessingQueue = true;
-
-  try {
-    while (extensionEnabled && requestQueue.size > 0) {
-      // Re-check rate limit before starting each request.
-      const waitTime = rateLimitResetTime * 1000 - Date.now();
-      if (waitTime > 0) {
-        await waitForQueue(Math.min(waitTime, 60000));
-        continue;
-      }
-      rateLimitResetTime = 0;
-
-      // Get the next screenName to process
-      const screenName = requestQueue.keys().next().value;
-      const callbacks = requestQueue.get(screenName);
-      const requestEpoch = queueClearEpoch;
-
-      // Remove from queue
-      requestQueue.delete(screenName);
-
-      try {
-        const location = await makeAboutAccountQueryRequest(screenName);
-        callbacks.forEach(({ resolve }) => resolve(location));
-      } catch (error) {
-        callbacks.forEach(({ reject }) => reject(error));
-      }
-
-      if (extensionEnabled && requestEpoch === queueClearEpoch) await waitForQueue(200);
-    }
-  } finally {
-    isProcessingQueue = false;
-  }
-}
-
 // Make actual API request
 function makeAboutAccountQueryRequest(screenName) {
   return new Promise((resolve, reject) => {
     const requestId = Date.now() + Math.random();
-    const requestEpoch = queueClearEpoch;
     activeBridgeRequest = { screenName, requestId };
 
     const cleanup = () => {
@@ -566,14 +442,12 @@ function makeAboutAccountQueryRequest(screenName) {
       clearTimeout(timeout);
       if (cancelActiveRequest === cancel) cancelActiveRequest = null;
       if (activeBridgeRequest?.requestId === requestId) activeBridgeRequest = null;
+      activeCoordinatorToken = null;
     };
-    const cancel = (retain = false) => {
+    const cancel = () => {
       cleanup();
-      if (retain && !requestQueue.has(screenName)) {
-        requestQueue.set(screenName, []);
-      }
       window.postMessage({ type: "__cancelAboutAccountQuery", requestId }, window.location.origin);
-      resolve(null);
+      resolve({ cancelled: true });
     };
     cancelActiveRequest = cancel;
 
@@ -594,44 +468,7 @@ function makeAboutAccountQueryRequest(screenName) {
               (typeof error === "string" && error.length > 0 && error.length <= 500)) ||
             ((isRateLimited || error) && account !== null) || (isRateLimited && error)) return;
         cleanup();
-        if (event.data.error) {
-          reject(new Error(event.data.error));
-          return;
-        }
-
-        // If the page signalled rate-limiting, trigger immediate backoff so we stop
-        // sending further requests for a while. Do not cache rate-limited failures.
-        if (isRateLimited) {
-          // Fall back to two minutes if the response did not provide a future reset.
-          if (rateLimitResetTime <= Date.now() / 1000) {
-            rateLimitResetTime = Math.floor(Date.now() / 1000) + 120;
-          }
-          // Keep this username pending so it can be retried after reset.
-          if (queueClearEpoch === requestEpoch) {
-            addToPersistedQueue(screenName);
-            if (!requestQueue.has(screenName)) {
-              requestQueue.set(screenName, []);
-            }
-            processRequestQueue();
-          }
-        } else {
-          const status = cacheManager.getAccountStatus(account);
-          if (!status) {
-            reject(new Error(`Invalid account response for ${screenName}`));
-            return;
-          }
-          try {
-            await cacheManager.saveCacheEntry(screenName, account);
-            // Keep work pending if the result could not be persisted.
-            removeFromPersistedQueue(screenName);
-          } catch (error) {
-            console.error("Error saving account result:", error);
-          }
-          resolve(status === "missing" ? null : account);
-          return;
-        }
-
-        resolve(undefined);
+        resolve({ account, isRateLimited, ...(error ? { error } : {}), rateLimitInfo: latestRateLimitInfo });
       }
     };
 
@@ -676,17 +513,17 @@ async function getAboutAccount(screenName) {
       return cacheManager.getAccountStatus(data.account) === "missing" ? null : data.account;
     }
 
-    // Not cached, queue the API request
+    // Register the caller before the background can broadcast a shared result.
     return new Promise((resolve, reject) => {
-      if (!requestQueue.has(screenName)) {
-        requestQueue.set(screenName, []);
-        addToPersistedQueue(screenName);
-      }
-      requestQueue.get(screenName).push({ resolve, reject });
-      // If this is the first request for this screenName, start processing
-      if (requestQueue.get(screenName).length === 1) {
-        processRequestQueue();
-      }
+      const waiter = { resolve, reject };
+      accountWaiters.set(screenName, waiter);
+      browser.runtime.sendMessage({ type: "queueAccountQuery", screenName }).then((response) => {
+        if (!response?.queued) throw new Error(response?.error || "Unable to queue account request");
+      }).catch((error) => {
+        if (accountWaiters.get(screenName) !== waiter) return;
+        accountWaiters.delete(screenName);
+        reject(error);
+      });
     });
   })();
 
@@ -1181,8 +1018,12 @@ function observeDynamicContent() {
   // Initialize theme cache for tooltip performance
   initializeThemeCache();
 
-  // Restore any queued usernames from a previous page load
-  await restorePersistedQueue();
+  // Wake the shared queue after the authenticated page bridge is ready.
+  try {
+    await browser.runtime.sendMessage({ type: "resumeAccountQueue" });
+  } catch (error) {
+    console.error("Unable to resume shared account queue:", error);
+  }
 
   // Process usernames on initial load
   processUsernames();

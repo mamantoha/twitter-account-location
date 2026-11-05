@@ -3,7 +3,7 @@
   "name": "Twitter Account Location",
   "version": "1.1.3",
   "description": "Show account based location",
-  "permissions": ["activeTab", "storage", "tabs"],
+  "permissions": ["activeTab", "storage", "tabs", "alarms"],
   "host_permissions": ["https://x.com/*"],
   "icons": {
     "16": "assets/logo.svg",
@@ -16,7 +16,7 @@
     "default_title": "Twitter Location"
   },
   "background": {
-    "scripts": ["src/background.js"]
+    "scripts": ["src/cacheManager.js", "src/requestCoordinator.js", "src/background.js"]
   },
   "content_scripts": [
     {

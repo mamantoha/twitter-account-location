@@ -2,6 +2,11 @@
 if (typeof browser === "undefined") {
   var browser = chrome;
 }
+// Chrome loads classic worker dependencies here; Firefox lists them in its manifest.
+/* global importScripts */
+if (typeof importScripts === "function") {
+  importScripts("cacheManager.js", "requestCoordinator.js");
+}
 // background.js for Twitter Account Location extension
 // Handles icon enable/disable based on active tab
 

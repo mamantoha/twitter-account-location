@@ -7,13 +7,14 @@ This is a browser extension for Twitter/X that displays account-based location i
 - **src/content.js**: Main content script. Detects usernames, communicates with the injected page script, and updates the UI with location info.
 - **src/pageScript.js**: Injected into the page context. Handles API requests to Twitter's GraphQL endpoint using the user's authentication/cookies.
 - **src/cacheManager.js**: Validates and caches account responses in IndexedDB for 30 days, or one day for confirmed missing accounts. Prunes stale entries in a single transaction.
+- **src/requestCoordinator.js**: Owns the shared queue, persistence, execution leases, cancellation, and rate-limit backoff. Uses alarms to resume after background suspension and delegates authenticated requests to ready X tabs.
 - **src/background.js**: Enables the toolbar action on X tabs and asks content scripts to refresh the enabled setting when tabs change.
 - **src/popup.js / src/popup.html**: Accessible extension controls, paginated/searchable cached profiles, and location statistics.
 - **manifest.firefox.json / manifest.chrome.json**: Tracked browser-specific manifests. A root `manifest.json` is an ignored local copy used for development. Packaging copies the appropriate tracked manifest into an isolated build directory.
 
 ## Data Flow
 1. **Detection**: `src/content.js` parses profile links on `https://x.com/*`, batches DOM mutations, and normalizes queue/cache keys to lowercase.
-2. **Request**: Cache misses enter a per-tab serial queue. The content script communicates with `src/pageScript.js` through validated `window.postMessage` messages targeting the page origin.
+2. **Request**: Cache misses enter the background coordinator's shared serial queue. It delegates work to one ready tab, which communicates with `src/pageScript.js` through validated `window.postMessage` messages targeting the page origin.
 3. **API Call**: `src/pageScript.js` captures authorization and CSRF headers from X's GraphQL traffic, queries `AboutAccountQuery`, and returns results and correlated rate-limit updates. Requests have readiness, fetch, and response timeouts.
 4. **Caching**: Valid account and confirmed-missing results are cached via `src/cacheManager.js`; HTTP/GraphQL errors and malformed results are not cached. Writes resolve only after transaction completion.
 5. **Display**: Location info is injected next to usernames in the UI.
@@ -27,8 +28,8 @@ This is a browser extension for Twitter/X that displays account-based location i
 ## Project-Specific Patterns
 - **API Integration**: All Twitter API calls are made from the injected page script (`src/pageScript.js`) to avoid CORS/auth issues.
 - **Caching**: Expiration is checked on reads; popup scans also prune expired/invalid entries. Confirmed missing accounts complete pending work without displaying a location label.
-- **Rate Limiting**: The queue uses response headers rather than a fixed allowance, waits 200 ms between requests, and uses a two-minute fallback when rate limited without a usable reset time. Queues/backoff remain per tab; cross-tab queue coordination is not implemented.
-- **Enabled State and Clearing**: The enabled setting syncs through storage changes. Disabling cancels active work and retains pending usernames. Clearing discards current-tab pending work and skips currently visible containers until reload/replacement.
+- **Rate Limiting**: The queue uses response headers rather than a fixed allowance, waits 200 ms between requests, and uses a two-minute fallback when rate limited without a usable reset time. Queues/backoff are shared across X tabs and persisted by a single background writer. Alarms restore scheduling after worker suspension; an active execution lease survives worker restarts.
+- **Enabled State and Clearing**: The enabled setting syncs through storage changes. Disabling cancels active work and retains pending usernames. Clearing increments a persisted shared generation, settles pending callers in every X tab, and skips currently visible containers until reload/replacement.
 
 ## External Dependencies
 - No third-party runtime libraries; ESLint is a development dependency.
@@ -39,7 +40,7 @@ This is a browser extension for Twitter/X that displays account-based location i
 - **IndexedDB Usage**: `cacheManager.js` provides a simple pattern for storing and expiring cached data.
 
 ## Key Files
-- `src/content.js`, `src/pageScript.js`, `src/cacheManager.js`, `manifest.*.json`, `Makefile`, `README.md`
+- `src/content.js`, `src/requestCoordinator.js`, `src/pageScript.js`, `src/cacheManager.js`, `manifest.*.json`, `Makefile`, `README.md`
 
 ---
 

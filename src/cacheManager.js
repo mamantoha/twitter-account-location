@@ -131,12 +131,12 @@ class CacheManager {
   }
 
   // Save a cache entry to IndexedDB
-  async saveCacheEntry(username, account) {
+  async saveCacheEntry(username, account, cachedAt = Date.now()) {
     if (!browser.runtime?.id || !this.getAccountStatus(account)) {
       return;
     }
     await this.runWriteTransaction((store) => {
-      store.put({ account: account, cachedAt: Date.now() }, username);
+      store.put({ account: account, cachedAt: cachedAt }, username);
     });
   }
 

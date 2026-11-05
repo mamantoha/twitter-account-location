@@ -70,7 +70,7 @@ function initializeClearQueueButton() {
     clearQueueButtonEl.disabled = true;
     popupStatusEl.textContent = "";
     try {
-      const response = await sendToActiveTab({ type: "clearPersistedQueue" });
+      const response = await browser.runtime.sendMessage({ type: "clearSharedAccountQueue" });
       if (!response?.cleared) throw new Error("Queue clearing failed");
       popupStatusEl.textContent = "Queue cleared.";
       await updateRateLimitInfo();
@@ -371,11 +371,7 @@ function renderCountryStats(entries) {
 
 async function updateRateLimitInfo() {
   try {
-    const response = await sendToActiveTab({ type: "getRateLimitInfo" });
-    if (response === null) {
-      rateLimitInfoEl.textContent = "API Rate Limit: No active tab";
-      return;
-    }
+    const response = await browser.runtime.sendMessage({ type: "getSharedRateLimitInfo" });
     if (response && typeof response === "object") {
       let text = "API Rate Limit: ";
       if (
