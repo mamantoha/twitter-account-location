@@ -56,11 +56,22 @@ const PROFILES_PAGE_SIZE = 100;
   await renderCacheViews();
 })();
 
+async function getActiveTabId() {
+  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+  return tabs[0]?.id ?? null;
+}
+
 // A null result means there is no active tab to receive the message.
 async function sendToActiveTab(message) {
-  const tabs = await browser.tabs.query({ active: true, currentWindow: true });
-  if (!tabs[0]?.id) return null;
-  return browser.tabs.sendMessage(tabs[0].id, message);
+  const tabId = await getActiveTabId();
+  if (tabId === null) return null;
+  return browser.tabs.sendMessage(tabId, message);
+}
+
+async function sendToActiveQueue(message) {
+  const tabId = await getActiveTabId();
+  if (tabId === null) return null;
+  return browser.runtime.sendMessage({ ...message, tabId });
 }
 
 function initializeClearQueueButton() {
@@ -70,7 +81,7 @@ function initializeClearQueueButton() {
     clearQueueButtonEl.disabled = true;
     popupStatusEl.textContent = "";
     try {
-      const response = await browser.runtime.sendMessage({ type: "clearSharedAccountQueue" });
+      const response = await sendToActiveQueue({ type: "clearSharedAccountQueue" });
       if (!response?.cleared) throw new Error("Queue clearing failed");
       popupStatusEl.textContent = "Queue cleared.";
       await updateRateLimitInfo();
@@ -371,7 +382,7 @@ function renderCountryStats(entries) {
 
 async function updateRateLimitInfo() {
   try {
-    const response = await browser.runtime.sendMessage({ type: "getSharedRateLimitInfo" });
+    const response = await sendToActiveQueue({ type: "getSharedRateLimitInfo" });
     if (response && typeof response === "object") {
       let text = "API Rate Limit: ";
       if (

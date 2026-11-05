@@ -23,6 +23,8 @@ const inFlightRequests = new Map();
 const pendingLocationContainers = new WeakSet();
 const accountWaiters = new Map();
 let queueClearEpoch = 0;
+let queueScope = null;
+let queueClearGeneration = 0;
 let renderEpoch = 0;
 let cancelActiveRequest = null;
 let activeBridgeRequest = null;
@@ -65,9 +67,11 @@ function updateEnabledState(enabled) {
 
 browser.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
-  const shared = changes.account_request_state;
-  if (Number.isSafeInteger(shared?.newValue?.clearEpoch) &&
-      shared.newValue.clearEpoch > (shared.oldValue?.clearEpoch ?? 0)) clearLocalQueue();
+  const shared = changes.account_request_queues;
+  const nextClear = shared?.newValue?.[queueScope]?.state?.clearEpoch;
+  if (Number.isSafeInteger(nextClear) && nextClear > (shared.oldValue?.[queueScope]?.state?.clearEpoch ?? 0)) {
+    applyQueueClear(queueScope, nextClear);
+  }
   if (changes[TOGGLE_KEY]) {
     updateEnabledState(changes[TOGGLE_KEY].newValue ?? DEFAULT_ENABLED);
   }
@@ -86,6 +90,18 @@ async function loadEnabledState() {
   }
 }
 
+function rememberQueueScope(response) {
+  if (typeof response?.scope === "string") queueScope = response.scope;
+}
+
+function applyQueueClear(scope, generation) {
+  if (typeof scope !== "string" || (queueScope !== null && scope !== queueScope) ||
+      !Number.isSafeInteger(generation) || generation <= queueClearGeneration) return;
+  queueScope = scope;
+  queueClearGeneration = generation;
+  clearLocalQueue();
+}
+
 function clearLocalQueue() {
   queueClearEpoch += 1;
   renderEpoch += 1;
@@ -98,6 +114,8 @@ function clearLocalQueue() {
 }
 
 async function receiveSharedAccountResult(request) {
+  if (typeof request.scope !== "string" || (queueScope !== null && request.scope !== queueScope)) return;
+  queueScope = request.scope;
   const waiter = accountWaiters.get(request.screenName);
   const epoch = queueClearEpoch;
   if (request.error) {
@@ -132,13 +150,15 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.type === "executeSharedAccountQuery") {
-    if (!pageScriptReady || !pageAuthenticationReady || !extensionEnabled || activeBridgeRequest || activeCoordinatorToken ||
+    if (typeof request.scope !== "string" || (queueScope !== null && request.scope !== queueScope) ||
+        !pageScriptReady || !pageAuthenticationReady || !extensionEnabled || activeBridgeRequest || activeCoordinatorToken ||
         !Number.isFinite(request.deadline) || request.deadline <= Date.now() ||
         request.deadline > Date.now() + 20000 ||
         typeof request.token !== "string" || !usernameFromHref(`/${request.screenName}`)) {
       sendResponse({ accepted: false });
       return;
     }
+    queueScope = request.scope;
     activeCoordinatorToken = request.token;
     latestRateLimitInfo = { limit: null, remaining: null, resetTime: null, waitTime: null };
     sendResponse({ accepted: true });
@@ -172,6 +192,10 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
       if (cancelActiveRequest) cancelActiveRequest();
     }
     sendResponse({ cancelled: activeCoordinatorToken === null });
+    return;
+  } else if (request.type === "sharedAccountQueueCleared") {
+    applyQueueClear(request.scope, request.clearEpoch);
+    sendResponse({ cleared: true });
     return;
   } else if (request.type === "sharedAccountQueryResult") {
     receiveSharedAccountResult(request).then(() => sendResponse({ received: true }));
@@ -293,7 +317,7 @@ function injectPageScript() {
     if (event.data.type === "__aboutAccountHeadersReady") {
       pageAuthenticationReady = true;
       if (pageScriptReady) {
-        browser.runtime.sendMessage({ type: "resumeAccountQueue" }).catch((error) => {
+        browser.runtime.sendMessage({ type: "resumeAccountQueue" }).then(rememberQueueScope).catch((error) => {
           console.error("Unable to resume authenticated account requests:", error);
         });
       }
@@ -517,6 +541,7 @@ async function getAboutAccount(screenName) {
       accountWaiters.set(screenName, waiter);
       browser.runtime.sendMessage({ type: "queueAccountQuery", screenName }).then((response) => {
         if (!response?.queued) throw new Error(response?.error || "Unable to queue account request");
+        rememberQueueScope(response);
       }).catch((error) => {
         if (accountWaiters.get(screenName) !== waiter) return;
         accountWaiters.delete(screenName);
@@ -1015,7 +1040,7 @@ function observeDynamicContent() {
 
   // Wake the shared queue after the authenticated page bridge is ready.
   try {
-    await browser.runtime.sendMessage({ type: "resumeAccountQueue" });
+    rememberQueueScope(await browser.runtime.sendMessage({ type: "resumeAccountQueue" }));
   } catch (error) {
     console.error("Unable to resume shared account queue:", error);
   }
