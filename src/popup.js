@@ -11,6 +11,7 @@ const toggleSwitchEl = document.getElementById("toggleSwitch");
 const cacheInfoEl = document.getElementById("cacheInfo");
 const rateLimitInfoEl = document.getElementById("rateLimitInfo");
 const clearQueueButtonEl = document.getElementById("clearQueueButton");
+const popupStatusEl = document.getElementById("popupStatus");
 
 const tabProfilesEl = document.getElementById("tabProfiles");
 const tabStatsEl = document.getElementById("tabStats");
@@ -30,31 +31,29 @@ let profilesPage = 0;
 let profilesFilterTimer = null;
 const PROFILES_PAGE_SIZE = 100;
 
-// Load current state
+// Initialize controls independently of storage and tab availability.
 (async function initPopup() {
+  initializeTabs();
+  initializeProfilesSearch();
+  initializeProfilesPagination();
+  initializeClearQueueButton();
   try {
     const result = await browser.storage.local.get([TOGGLE_KEY]);
     const isEnabled =
       result[TOGGLE_KEY] !== undefined ? result[TOGGLE_KEY] : DEFAULT_ENABLED;
     updateToggle(isEnabled);
-    await updateRateLimitInfo();
-    // Show extension version only
-    const manifest = browser.runtime.getManifest();
-    const version = manifest.version || "?";
-    const extVersion = document.getElementById("extVersion");
-    if (extVersion) {
-      extVersion.textContent = `Version: ${version}`;
-    }
-
-    initializeTabs();
-    await renderCacheViews();
-    initializeProfilesSearch();
-    initializeProfilesPagination();
-    initializeClearQueueButton();
   } catch (e) {
     console.error("Error loading toggle state in popup:", e);
-    updateToggle(DEFAULT_ENABLED);
+    popupStatusEl.textContent = "Unable to load extension state. Try toggling again.";
+  } finally {
+    toggleSwitchEl.disabled = false;
   }
+
+  const manifest = browser.runtime.getManifest();
+  const extVersion = document.getElementById("extVersion");
+  if (extVersion) extVersion.textContent = `Version: ${manifest.version || "?"}`;
+  await updateRateLimitInfo();
+  await renderCacheViews();
 })();
 
 function initializeClearQueueButton() {
@@ -62,23 +61,23 @@ function initializeClearQueueButton() {
 
   clearQueueButtonEl.addEventListener("click", async () => {
     clearQueueButtonEl.disabled = true;
+    popupStatusEl.textContent = "";
     try {
       const tabs = await browser.tabs.query({
         active: true,
         currentWindow: true,
       });
 
-      if (!tabs[0]?.id) {
-        return;
-      }
-
-      await browser.tabs.sendMessage(tabs[0].id, {
+      if (!tabs[0]?.id) throw new Error("No active tab available for clearing the queue");
+      const response = await browser.tabs.sendMessage(tabs[0].id, {
         type: "clearPersistedQueue",
       });
-
+      if (!response?.cleared) throw new Error("Queue clearing failed");
+      popupStatusEl.textContent = "Queue cleared.";
       await updateRateLimitInfo();
     } catch (e) {
       console.error("Error clearing queue:", e);
+      popupStatusEl.textContent = "Unable to clear the queue. Try again.";
     } finally {
       clearQueueButtonEl.disabled = false;
     }
@@ -149,6 +148,7 @@ async function deleteCacheEntry(username) {
   const cleaned = typeof username === "string" ? username.trim() : "";
   if (!cleaned) return;
 
+  popupStatusEl.textContent = "";
   try {
     const tabs = await browser.tabs.query({
       active: true,
@@ -168,7 +168,7 @@ async function deleteCacheEntry(username) {
     await refreshCacheViews();
   } catch (e) {
     console.error("Error deleting cache entry:", e);
-    cacheInfoEl.textContent = "Unable to delete cached profile. Try again.";
+    popupStatusEl.textContent = "Unable to delete cached profile. Try again.";
   }
 }
 
@@ -183,6 +183,8 @@ function initializeTabs() {
 
     tabProfilesEl.setAttribute("aria-selected", String(isProfiles));
     tabStatsEl.setAttribute("aria-selected", String(!isProfiles));
+    tabProfilesEl.tabIndex = isProfiles ? 0 : -1;
+    tabStatsEl.tabIndex = isProfiles ? -1 : 0;
 
     if (tabPanelProfilesEl) tabPanelProfilesEl.hidden = !isProfiles;
     if (tabPanelStatsEl) tabPanelStatsEl.hidden = isProfiles;
@@ -191,6 +193,19 @@ function initializeTabs() {
   tabProfilesEl.addEventListener("click", () => setActive("profiles"));
   tabStatsEl.addEventListener("click", () => setActive("stats"));
 
+  for (const tab of [tabProfilesEl, tabStatsEl]) {
+    tab.addEventListener("keydown", (event) => {
+      let target;
+      if (event.key === "Home") target = tabProfilesEl;
+      else if (event.key === "End") target = tabStatsEl;
+      else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+        target = tab === tabProfilesEl ? tabStatsEl : tabProfilesEl;
+      } else return;
+      event.preventDefault();
+      setActive(target === tabProfilesEl ? "profiles" : "stats");
+      target.focus();
+    });
+  }
   setActive("profiles");
 }
 
@@ -294,7 +309,7 @@ function renderProfiles(entries, { isFiltered = false } = {}) {
       const deleteBtn = document.createElement("button");
       deleteBtn.className = "icon-button";
       deleteBtn.type = "button";
-      deleteBtn.setAttribute("aria-label", "Delete from cache");
+      deleteBtn.setAttribute("aria-label", `Delete @${username} from cache`);
       deleteBtn.title = "Delete from cache";
 
       deleteBtn.innerHTML =
@@ -420,6 +435,8 @@ async function updateRateLimitInfo() {
 }
 // Toggle click handler
 toggleSwitchEl.addEventListener("click", async () => {
+  toggleSwitchEl.disabled = true;
+  popupStatusEl.textContent = "";
   try {
     const result = await browser.storage.local.get([TOGGLE_KEY]);
     const currentState =
@@ -428,6 +445,7 @@ toggleSwitchEl.addEventListener("click", async () => {
 
     await browser.storage.local.set({ [TOGGLE_KEY]: newState });
     updateToggle(newState);
+    popupStatusEl.textContent = newState ? "Extension enabled." : "Extension disabled.";
 
     // Notify content script to update
     try {
@@ -446,10 +464,14 @@ toggleSwitchEl.addEventListener("click", async () => {
     }
   } catch (error) {
     console.error("Error toggling extension state:", error);
+    popupStatusEl.textContent = "Unable to change extension state. Try again.";
+  } finally {
+    toggleSwitchEl.disabled = false;
   }
 });
 
 function updateToggle(isEnabled) {
+  toggleSwitchEl.setAttribute("aria-checked", String(isEnabled));
   if (isEnabled) {
     toggleSwitchEl.classList.add("enabled");
   } else {

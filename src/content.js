@@ -150,11 +150,7 @@ async function clearPersistedQueue() {
     persistedQueueSaveTimer = null;
   }
 
-  try {
-    await browser.storage.local.set({ [PERSISTED_QUEUE_KEY]: [] });
-  } catch (e) {
-    // Ignore persistence errors
-  }
+  await browser.storage.local.set({ [PERSISTED_QUEUE_KEY]: [] });
 }
 
 async function restorePersistedQueue() {

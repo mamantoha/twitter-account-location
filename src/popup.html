@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
   <meta charset="UTF-8">
+  <title>Twitter Account Location</title>
   <style>
     html {
       height: 600px;
@@ -63,6 +64,9 @@
     }
 
     .toggle-switch {
+      border: 0;
+      padding: 0;
+      flex-shrink: 0;
       position: relative;
       width: 44px;
       height: 24px;
@@ -70,6 +74,17 @@
       border-radius: 12px;
       cursor: pointer;
       transition: background 0.2s;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    [tabindex]:focus-visible {
+      outline: 2px solid #1d9bf0;
+      outline-offset: 2px;
+    }
+
+    .popup-status:empty {
+      display: none;
     }
 
     .toggle-switch.enabled {
@@ -428,24 +443,25 @@
     </div>
 
     <div class="toggle-container">
-      <span class="toggle-label">Enable Extension</span>
-      <div class="toggle-switch" id="toggleSwitch"></div>
+      <span class="toggle-label" id="toggleLabel">Enable Extension</span>
+      <button class="toggle-switch" id="toggleSwitch" type="button" role="switch" aria-checked="false" aria-labelledby="toggleLabel" disabled></button>
     </div>
 
     <div class="cache-info" id="cacheInfo">Cached locations: Loading...</div>
     <div class="cache-info" id="rateLimitInfo">API Rate Limit: Loading...</div>
+    <div class="cache-info popup-status" id="popupStatus" role="status" aria-live="polite" aria-atomic="true"></div>
 
     <div class="tabs" role="tablist" aria-label="Cache views">
       <button class="tab-button active" id="tabProfiles" role="tab" aria-selected="true" aria-controls="tabPanelProfiles" type="button">Profiles</button>
-      <button class="tab-button" id="tabStats" role="tab" aria-selected="false" aria-controls="tabPanelStats" type="button">Stats</button>
+      <button class="tab-button" id="tabStats" role="tab" aria-selected="false" aria-controls="tabPanelStats" tabindex="-1" type="button">Stats</button>
     </div>
   </div>
 
   <div class="middle">
     <div class="tab-panels">
       <div class="tab-panel" id="tabPanelProfiles" role="tabpanel" aria-labelledby="tabProfiles">
-        <input class="search" id="profilesSearch" type="search" placeholder="Search profiles…" autocomplete="off" />
-        <div class="list" id="profilesList">Loading...</div>
+        <input class="search" id="profilesSearch" type="search" aria-label="Search cached profiles by username or location" placeholder="Search profiles…" autocomplete="off" />
+        <div class="list" id="profilesList" role="region" tabindex="0" aria-label="Cached profiles">Loading...</div>
         <div class="profile-pagination" id="profilesPagination" hidden>
           <button class="icon-button" id="profilesPrevious" type="button" aria-label="Previous profiles page">←</button>
           <span id="profilesPageInfo" aria-live="polite"></span>
@@ -453,7 +469,7 @@
         </div>
       </div>
       <div class="tab-panel" id="tabPanelStats" role="tabpanel" aria-labelledby="tabStats" hidden>
-        <div class="list" id="countryStats">Loading...</div>
+        <div class="list" id="countryStats" role="region" tabindex="0" aria-label="Cached profiles by location">Loading...</div>
       </div>
     </div>
   </div>
