@@ -64,16 +64,30 @@
     return result;
   };
 
+  function isValidRequestId(value) {
+    return typeof value === "number" && Number.isFinite(value) && value > 0 && value <= Number.MAX_SAFE_INTEGER;
+  }
+
+  function readRateLimitHeader(response, name) {
+    const raw = response.headers.get(name);
+    if (raw === null || !/^\d+$/.test(raw)) return null;
+    const value = Number(raw);
+    return Number.isSafeInteger(value) ? value : null;
+  }
+
   // Listen for fetch requests from content script via postMessage
   window.addEventListener("message", async function (event) {
-    if (event.source !== window) return;
+    if (event.source !== window || event.origin !== window.location.origin ||
+        event.data === null || typeof event.data !== "object" || Array.isArray(event.data)) return;
     if (event.data?.type === "__cancelAboutAccountQuery") {
-      activeRequests.get(event.data.requestId)?.abort();
+      if (isValidRequestId(event.data.requestId)) activeRequests.get(event.data.requestId)?.abort();
       return;
     }
     // Handle requests from the content script
     if (event.data && event.data.type === "__fetchAboutAccountQuery") {
       const { screenName, requestId } = event.data;
+      if (typeof screenName !== "string" || !/^[a-zA-Z0-9_]{1,15}$/.test(screenName) ||
+          !isValidRequestId(requestId) || activeRequests.has(requestId)) return;
 
       // --- Simple rate limit block ---
       window._aboutAccountRateLimitReset =
@@ -88,7 +102,7 @@
             requestId,
             isRateLimited: true,
           },
-          "*"
+          window.location.origin
         );
         return;
       }
@@ -116,7 +130,7 @@
             account: null,
             isRateLimited: false,
             error: "Authentication headers unavailable; reload X while logged in",
-          }, "*");
+          }, window.location.origin);
           return;
         }
         const variables = JSON.stringify({ screenName });
@@ -136,21 +150,25 @@
           referrerPolicy: "origin-when-cross-origin",
         });
 
-        const resetTime = response.headers.get("x-rate-limit-reset");
-        const remaining = response.headers.get("x-rate-limit-remaining");
-        const limit = response.headers.get("x-rate-limit-limit");
+        const resetValue = readRateLimitHeader(response, "x-rate-limit-reset");
+        const resetTime = resetValue !== null && resetValue <= Math.floor(Date.now() / 1000) + 86400
+          ? resetValue : null;
+        const remaining = readRateLimitHeader(response, "x-rate-limit-remaining");
+        const limit = readRateLimitHeader(response, "x-rate-limit-limit");
 
         window.postMessage(
           {
             type: "__rateLimitHeaders",
-            limit: limit ? parseInt(limit) : null,
-            remaining: remaining ? parseInt(remaining) : null,
-            resetTime: resetTime ? parseInt(resetTime) : null,
+            screenName,
+            requestId,
+            limit,
+            remaining,
+            resetTime,
             waitTime: resetTime
-              ? Math.max(0, parseInt(resetTime) * 1000 - Date.now())
+              ? Math.max(0, resetTime * 1000 - Date.now())
               : null,
           },
-          "*"
+          window.location.origin
         );
 
         if (response.ok) {
@@ -164,7 +182,7 @@
               requestId,
               isRateLimited: false,
             },
-            "*"
+            window.location.origin
           );
           return;
         } else {
@@ -173,8 +191,8 @@
           // Handle rate limiting
           if (response.status === 429) {
             if (resetTime) {
-              window._aboutAccountRateLimitReset = parseInt(resetTime);
-              const resetDate = new Date(parseInt(resetTime) * 1000);
+              window._aboutAccountRateLimitReset = resetTime;
+              const resetDate = new Date(resetTime * 1000);
               const now = Date.now();
               const waitTime = resetDate.getTime() - now;
 
@@ -182,12 +200,14 @@
               window.postMessage(
                 {
                   type: "__rateLimitInfo",
-                  resetTime: parseInt(resetTime),
+                  screenName,
+                  requestId,
+                  resetTime,
                   waitTime: Math.max(0, waitTime),
-                  remaining: remaining ? parseInt(remaining) : null,
-                  limit: limit ? parseInt(limit) : null,
+                  remaining,
+                  limit,
                 },
-                "*"
+                window.location.origin
               );
             }
           } else {
@@ -206,7 +226,7 @@
             isRateLimited: response.status === 429,
             error: response.status === 429 ? null : `Account request failed (HTTP ${response.status})`,
           },
-          "*"
+          window.location.origin
         );
       } catch (error) {
         console.error("Error fetching location:", error);
@@ -219,7 +239,7 @@
             isRateLimited: false,
             error: error.name === "AbortError" ? "Account fetch timed out" : "Account fetch failed",
           },
-          "*"
+          window.location.origin
         );
       } finally {
         activeRequests.delete(requestId);
@@ -227,5 +247,5 @@
       }
     }
   });
-  window.postMessage({ type: "__aboutAccountQueryReady" }, "*");
+  window.postMessage({ type: "__aboutAccountQueryReady" }, window.location.origin);
 })();

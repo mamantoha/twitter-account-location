@@ -65,7 +65,7 @@ A browser extension that displays account-based location information next to Twi
   - Make same-origin requests to Twitter's API without CORS issues
   - Work seamlessly with Twitter's authentication system
 
-- **Content Script Communication:** The content script listens for location fetch requests. When a username is detected, it sends a custom event to the page script, which makes the API request and returns the location data.
+- **Content Script Communication:** The content script uses `window.postMessage` to request account data from the page script. Both sides check the message source, origin, and payload; responses and rate-limit updates are matched to the active request. Messages target X's exact origin. These checks do not authenticate other scripts running on the same X page.
 
 - **Caching:** Location data is cached in your browser's IndexedDB and expires automatically after 30 days to minimize API calls and improve performance.
   Confirmed missing accounts are cached for one day. HTTP errors, GraphQL errors, and malformed responses are not cached.

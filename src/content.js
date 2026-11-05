@@ -32,6 +32,7 @@ let persistedQueueSaveTimer = null;
 let queueClearEpoch = 0;
 let renderEpoch = 0;
 let cancelActiveRequest = null;
+let activeBridgeRequest = null;
 const clearedContainers = new WeakSet();
 let pageScriptReady = false;
 let wakeRequestQueue = null;
@@ -305,6 +306,23 @@ browser.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+// Page scripts share this channel; origin and shape checks do not authenticate them.
+function isPageMessage(event) {
+  return event.source === window && event.origin === window.location.origin &&
+    event.data !== null && typeof event.data === "object" && !Array.isArray(event.data);
+}
+
+function isValidRateLimitMessage(data) {
+  if (!activeBridgeRequest || data.requestId !== activeBridgeRequest.requestId ||
+      data.screenName !== activeBridgeRequest.screenName) return false;
+  if (![data.limit, data.remaining, data.resetTime, data.waitTime].every(
+    (value) => value === null || (Number.isSafeInteger(value) && value >= 0)
+  )) return false;
+  if (data.limit !== null && data.remaining !== null && data.remaining > data.limit) return false;
+  return (data.resetTime === null || data.resetTime <= Math.floor(Date.now() / 1000) + 86400) &&
+    (data.waitTime === null || data.waitTime <= 86400000);
+}
+
 // Inject script into page context to access fetch with proper cookies
 function injectPageScript() {
   const script = document.createElement("script");
@@ -317,7 +335,7 @@ function injectPageScript() {
       script.remove();
     };
     const onReady = (event) => {
-      if (event.source !== window || event.data?.type !== "__aboutAccountQueryReady") return;
+      if (!isPageMessage(event) || event.data.type !== "__aboutAccountQueryReady") return;
       cleanup();
       resolve();
     };
@@ -334,8 +352,10 @@ function injectPageScript() {
 
   // Listen for rate limit info from page script
   window.addEventListener("message", (event) => {
-    if (event.source !== window) return;
-    if (event.data && event.data.type === "__rateLimitInfo") {
+    if (!isPageMessage(event)) return;
+    if (event.data.type !== "__rateLimitInfo" && event.data.type !== "__rateLimitHeaders") return;
+    if (!isValidRateLimitMessage(event.data)) return;
+    if (event.data.type === "__rateLimitInfo") {
       // The page script may provide a resetTime (unix seconds)
       const providedReset = event.data.resetTime;
       // If reset time provided use it, otherwise fallback to 2 minutes
@@ -546,26 +566,27 @@ function makeAboutAccountQueryRequest(screenName) {
   return new Promise((resolve, reject) => {
     const requestId = Date.now() + Math.random();
     const requestEpoch = queueClearEpoch;
+    activeBridgeRequest = { screenName, requestId };
 
     const cleanup = () => {
       window.removeEventListener("message", handler);
       clearTimeout(timeout);
       if (cancelActiveRequest === cancel) cancelActiveRequest = null;
+      if (activeBridgeRequest?.requestId === requestId) activeBridgeRequest = null;
     };
     const cancel = (retain = false) => {
       cleanup();
       if (retain && !requestQueue.has(screenName)) {
         requestQueue.set(screenName, []);
       }
-      window.postMessage({ type: "__cancelAboutAccountQuery", requestId }, "*");
+      window.postMessage({ type: "__cancelAboutAccountQuery", requestId }, window.location.origin);
       resolve(null);
     };
     cancelActiveRequest = cancel;
 
     // Listen for response via postMessage
     const handler = async (event) => {
-      // Only accept messages from the page (not from extension)
-      if (event.source !== window) return;
+      if (!isPageMessage(event)) return;
 
       if (
         event.data &&
@@ -573,13 +594,17 @@ function makeAboutAccountQueryRequest(screenName) {
         event.data.screenName === screenName &&
         event.data.requestId === requestId
       ) {
+        const { account, isRateLimited, error } = event.data;
+        if (typeof isRateLimited !== "boolean" ||
+            !(account === null || (typeof account === "object" && !Array.isArray(account))) ||
+            !(error === undefined || error === null ||
+              (typeof error === "string" && error.length > 0 && error.length <= 500)) ||
+            ((isRateLimited || error) && account !== null) || (isRateLimited && error)) return;
         cleanup();
         if (event.data.error) {
           reject(new Error(event.data.error));
           return;
         }
-        const account = event.data.account;
-        const isRateLimited = event.data.isRateLimited || false;
 
         // If the page signalled rate-limiting, trigger immediate backoff so we stop
         // sending further requests for a while. Do not cache rate-limited failures.
@@ -620,7 +645,7 @@ function makeAboutAccountQueryRequest(screenName) {
     window.addEventListener("message", handler);
     const timeout = setTimeout(() => {
       cleanup();
-      window.postMessage({ type: "__cancelAboutAccountQuery", requestId }, "*");
+      window.postMessage({ type: "__cancelAboutAccountQuery", requestId }, window.location.origin);
       reject(new Error(`Account request timed out for ${screenName}`));
     }, 15000);
 
@@ -631,7 +656,7 @@ function makeAboutAccountQueryRequest(screenName) {
         screenName,
         requestId,
       },
-      "*"
+      window.location.origin
     );
   });
 }
