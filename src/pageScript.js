@@ -5,81 +5,64 @@
   let headersReady = false;
   const activeRequests = new Map();
 
-  // Function to capture headers from a request
-  function captureHeaders(headers) {
-    if (!headers) return;
-
-    const headerObj = {};
-    if (headers instanceof Headers) {
-      headers.forEach((value, key) => {
-        headerObj[key] = value;
-      });
-    } else if (headers instanceof Object) {
-      // Copy all headers
-      for (const [key, value] of Object.entries(headers)) {
-        headerObj[key] = value;
-      }
+  function isGraphQLRequest(input) {
+    try {
+      const url = new URL(input instanceof Request ? input.url : input, document.baseURI);
+      return url.origin === window.location.origin && url.pathname.startsWith("/i/api/graphql/");
+    } catch (error) {
+      return false;
     }
-
-    // Replace headers completely (don't merge) to ensure we get auth tokens
-    twitterHeaders = headerObj;
-    headersReady = true;
   }
 
-  // Intercept fetch to capture Twitter's headers
+  // Keep the latest complete authentication headers; ignore incomplete requests.
+  function captureHeaders(headers) {
+    if (!headers) return;
+    try {
+      const normalized = new Headers(headers);
+      if (!normalized.get("authorization") || !normalized.get("x-csrf-token")) return;
+      twitterHeaders = Object.fromEntries(normalized.entries());
+      headersReady = true;
+    } catch (error) {
+      // Header inspection must not prevent the page's original request.
+    }
+  }
+
+  // Intercept fetch without changing its input or init overrides.
   const originalFetch = window.fetch;
   window.fetch = function (...args) {
-    const url = args[0];
+    const input = args[0];
     const options = args[1] || {};
-
-    // If it's a Twitter GraphQL API call, capture ALL headers
-    if (typeof url === "string" && url.includes("x.com/i/api/graphql")) {
-      if (options.headers) {
-        captureHeaders(options.headers);
-      }
+    if (isGraphQLRequest(input)) {
+      captureHeaders(options.headers !== undefined
+        ? options.headers
+        : input instanceof Request ? input.headers : undefined);
     }
-
     return originalFetch.apply(this, args);
   };
 
-  // Also intercept XMLHttpRequest
+  // Also intercept XMLHttpRequest, resetting captured headers when reused.
   const originalXHROpen = XMLHttpRequest.prototype.open;
   const originalXHRSend = XMLHttpRequest.prototype.send;
+  const originalSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
 
   XMLHttpRequest.prototype.open = function (method, url, ...rest) {
+    const result = originalXHROpen.apply(this, [method, url, ...rest]);
     this._url = url;
-    return originalXHROpen.apply(this, [method, url, ...rest]);
+    this._headers = new Headers();
+    return result;
   };
 
   XMLHttpRequest.prototype.send = function (...args) {
-    if (this._url && this._url.includes("x.com/i/api/graphql")) {
-      const headers = {};
-      // Try to get headers from setRequestHeader
-      if (this._headers) {
-        Object.assign(headers, this._headers);
-      }
-      captureHeaders(headers);
-    }
+    if (isGraphQLRequest(this._url)) captureHeaders(this._headers);
     return originalXHRSend.apply(this, args);
   };
 
-  const originalSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
   XMLHttpRequest.prototype.setRequestHeader = function (header, value) {
-    if (!this._headers) this._headers = {};
-    this._headers[header] = value;
-    return originalSetRequestHeader.apply(this, [header, value]);
+    const result = originalSetRequestHeader.apply(this, [header, value]);
+    if (!this._headers) this._headers = new Headers();
+    this._headers.append(header, value);
+    return result;
   };
-
-  // Wait a bit for Twitter to make some API calls first
-  setTimeout(() => {
-    if (!headersReady) {
-      twitterHeaders = {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      };
-      headersReady = true;
-    }
-  }, 3000);
 
   // Listen for fetch requests from content script via postMessage
   window.addEventListener("message", async function (event) {
@@ -116,7 +99,7 @@
       // Wait for headers to be ready
       if (!headersReady) {
         let waitCount = 0;
-        while (!headersReady && waitCount < 30) {
+        while (!headersReady && !controller.signal.aborted && waitCount < 30) {
           await new Promise((resolve) => setTimeout(resolve, 100));
           waitCount++;
         }
@@ -125,16 +108,23 @@
       const timeout = setTimeout(() => controller.abort(), 10000);
       try {
         controller.signal.throwIfAborted();
+        if (!headersReady) {
+          window.postMessage({
+            type: "__aboutAccountQueryResponse",
+            screenName,
+            requestId,
+            account: null,
+            isRateLimited: false,
+            error: "Authentication headers unavailable; reload X while logged in",
+          }, "*");
+          return;
+        }
         const variables = JSON.stringify({ screenName });
         const url = `https://x.com/i/api/graphql/XRqGa7EeokUU5kppkh13EA/AboutAccountQuery?variables=${encodeURIComponent(
           variables
         )}`;
 
-        // Use captured headers or minimal defaults
-        const headers = twitterHeaders || {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        };
+        const headers = twitterHeaders;
 
         // Ensure credentials are included
         const response = await fetch(url, {
