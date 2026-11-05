@@ -46,6 +46,9 @@ let latestRateLimitInfo = {
 
 // Observer for dynamically loaded content
 let observer = null;
+let contentScanTimer = null;
+const USER_CONTAINER_SELECTOR = 'article[data-testid="tweet"], [data-testid="UserCell"], [data-testid="User-Names"], [data-testid="User-Name"]';
+const LOCATION_UI_SELECTOR = '[data-twitter-location], [data-twitter-location-spinner], .twitter-location-tooltip, #twitter-location-spinner-style';
 
 // Cached theme styles for tooltip performance
 let cachedThemeStyles = null;
@@ -126,7 +129,7 @@ function removeFromPersistedQueue(screenName) {
 async function clearPersistedQueue() {
   queueClearEpoch += 1;
   renderEpoch += 1;
-  document.querySelectorAll('article[data-testid="tweet"], [data-testid="UserCell"], [data-testid="User-Names"], [data-testid="User-Name"]').forEach((container) => {
+  document.querySelectorAll(USER_CONTAINER_SELECTOR).forEach((container) => {
     clearedContainers.add(container);
   });
   persistedQueuedUsernames.clear();
@@ -1167,18 +1170,17 @@ function removeAllLocations() {
 }
 
 // Function to process all username elements on the page
-async function processUsernames() {
+async function processUsernames(containers) {
   // Check if extension is enabled
   if (!extensionEnabled) {
     return;
   }
 
   // Find all tweet/article containers and user cells
-  const containers = document.querySelectorAll(
-    'article[data-testid="tweet"], [data-testid="UserCell"], [data-testid="User-Names"], [data-testid="User-Name"]'
-  );
+  containers = containers || document.querySelectorAll(USER_CONTAINER_SELECTOR);
 
   for (const container of containers) {
+    if (!container.isConnected) continue;
     if (clearedContainers.has(container)) continue;
     const screenName = extractUsername(container);
     if (screenName) {
@@ -1203,18 +1205,45 @@ function observeDynamicContent() {
   if (observer) {
     observer.disconnect();
   }
+  if (contentScanTimer !== null) {
+    clearTimeout(contentScanTimer);
+    contentScanTimer = null;
+  }
+
+  const pendingRoots = new Set();
+  const pendingContainers = new Set();
+  const collectAncestors = (element) => {
+    let container = element.closest(USER_CONTAINER_SELECTOR);
+    while (container) {
+      pendingContainers.add(container);
+      container = container.parentElement?.closest(USER_CONTAINER_SELECTOR);
+    }
+  };
 
   observer = new MutationObserver((mutations) => {
+    if (!extensionEnabled) return;
     for (const mutation of mutations) {
-      if (mutation.addedNodes.length > 0) {
-        mutation.addedNodes.forEach((node) => {
-          if (node.nodeType === 1) {
-            // Element nodes only
-            processUsernames();
-          }
-        });
+      if (mutation.target.closest(LOCATION_UI_SELECTOR)) continue;
+      for (const node of mutation.addedNodes) {
+        if (node.nodeType === 1 && node.closest(LOCATION_UI_SELECTOR)) continue;
+        // A handle can be added to an existing container as text or nested markup.
+        collectAncestors(mutation.target);
+        if (node.nodeType === 1) pendingRoots.add(node);
       }
     }
+    if (contentScanTimer !== null || (!pendingRoots.size && !pendingContainers.size)) return;
+    contentScanTimer = setTimeout(() => {
+      contentScanTimer = null;
+      for (const root of pendingRoots) {
+        if (!root.isConnected) continue;
+        collectAncestors(root);
+        root.querySelectorAll(USER_CONTAINER_SELECTOR).forEach((container) => pendingContainers.add(container));
+      }
+      pendingRoots.clear();
+      const containers = Array.from(pendingContainers);
+      pendingContainers.clear();
+      processUsernames(containers);
+    }, 0);
   });
 
   // Observe the body or a specific container
