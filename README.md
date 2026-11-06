@@ -140,7 +140,7 @@ For more help, see [Support](#support).
 
 Run `make firefox` or `make chrome` to create a ZIP in `dist/build/`, or `make -j all` to build both in parallel. Building requires Node.js, Make, and `zip`.
 
-`package.json` defines the archive version. Both browser manifests must match it. Release tags must use `v<version>` (for example, `v1.1.3`); check locally with `RELEASE_TAG=v1.1.3 make check-version`.
+`package.json` defines the archive version. Both browser manifests must match it. Release tags must use `v<version>` (for example, `v1.2.0`); check locally with `RELEASE_TAG=v1.2.0 make check-version`.
 
 Builds use separate temporary directories and do not modify a local `manifest.json`.
 
